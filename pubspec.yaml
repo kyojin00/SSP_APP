@@ -1,0 +1,44 @@
+name: sspaap
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  image_picker: ^1.1.2
+  firebase_core: ^3.0.0
+  firebase_messaging: ^15.0.0
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.12.0
+  flutter_local_notifications: ^20.0.0
+  intl: ^0.19.0
+  translator: ^1.0.4+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  # 1. 앱 아이콘 생성을 위한 패키지 추가
+  flutter_launcher_icons: ^0.13.1
+
+# 2. 앱 아이콘 상세 설정 추가 (여기에 파일 경로를 적습니다)
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/app_icon.png" # 👈 가지고 계신 아이콘 파일 경로
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    background_color: "#ffffff"
+    theme_color: "#3078ff" # sspaap 테마색 (파란색 계열)
+
+flutter:
+  uses-material-design: true
+
+  # 3. 앱 내에서 사용할 아이콘/이미지 폴더 등록
+  assets:
+    - assets/icons/
