@@ -10,20 +10,26 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.1.2
-  firebase_core: ^3.0.0
-  firebase_messaging: ^15.0.0
+  firebase_core: ^4.4.0
+  firebase_messaging: ^16.1.1
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.12.0
   flutter_local_notifications: ^20.0.0
-  intl: ^0.19.0
+  intl: ^0.20.2
   translator: ^1.0.4+1
+  geolocator: ^14.0.2
+  table_calendar: ^3.1.2
+  excel: ^4.0.3
+  path_provider: ^2.1.2
+  share_plus: ^12.0.1
+  shared_preferences: ^2.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   # 1. 앱 아이콘 생성을 위한 패키지 추가
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.14.4
 
 # 2. 앱 아이콘 상세 설정 추가 (여기에 파일 경로를 적습니다)
 flutter_launcher_icons:
@@ -42,3 +48,11 @@ flutter:
   # 3. 앱 내에서 사용할 아이콘/이미지 폴더 등록
   assets:
     - assets/icons/
+    - assets/guide/ios.jpg
+    - assets/guide/android.jpg
+  fonts:
+    - family: NotoSansKhmer
+      fonts:
+        - asset: assets/fonts/NotoSansKhmer-Regular.ttf
+        - asset: assets/fonts/NotoSansKhmer-Bold.ttf
+          weight: 700

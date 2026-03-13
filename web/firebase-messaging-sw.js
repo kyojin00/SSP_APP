@@ -2,32 +2,53 @@ importScripts('https://www.gstatic.com/firebasejs/9.10.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/9.10.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyAX8LhejArzq_XRMs4g8Hv8yc_9PuhTyvA", // 본인의 API Key
+  apiKey: "AIzaSyAX8LhejArzq_XRMs4g8Hv8yc_9PuhTyvA",
   authDomain: "sspapp-71608.firebaseapp.com",
   projectId: "sspapp-71608",
-  storageBucket: "sspapp-71608.appspot.com",
+  storageBucket: "sspapp-71608.firebasestorage.app",
   messagingSenderId: "135546039401",
-  appId: "1:135546039401:web:cd9e453d12df60a6c746f8"
+  appId: "1:135546039401:web:cd9e453d12df60a6c746f8",
 });
 
 const messaging = firebase.messaging();
 
-// ✅ 백그라운드 메시지 핸들러 수정
+/** ✅ 1) “진짜 push가 도착했는지” 확인용 (가장 중요) */
+self.addEventListener('push', (event) => {
+  console.log('[SW] push event arrived ✅', event);
+
+  // event.data가 없을 수도 있음(암호화 payload)
+  // 그래도 도착만 확인하면 됨
+});
+
+/** ✅ 2) FCM 백그라운드 메시지 → 항상 알림 표시 */
 messaging.onBackgroundMessage((payload) => {
-  console.log('[sw.js] 백그라운드 메시지 수신:', payload);
+  console.log('[SW] onBackgroundMessage payload ✅', payload);
 
-  // 👈 핵심: payload에 'notification' 객체가 이미 있다면 
-  // 브라우저가 자동으로 알림을 띄우므로 여기서 showNotification을 호출하지 않습니다.
-  if (payload.notification) {
-    return; 
-  }
+  const title =
+    payload?.notification?.title ||
+    payload?.data?.title ||
+    "알림";
 
-  // 만약 notification 없이 data만 온 경우에만 수동으로 띄웁니다.
-  const notificationTitle = payload.data?.title || "새 공지사항";
-  const notificationOptions = {
-    body: payload.data?.body || "",
-    icon: '/icons/Icon-192.png'
-  };
+  const body =
+    payload?.notification?.body ||
+    payload?.data?.body ||
+    "";
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  const url =
+    payload?.fcmOptions?.link ||
+    payload?.data?.url ||
+    "https://sspapp-71608.web.app";
+
+  return self.registration.showNotification(title, {
+    body,
+    icon: '/icons/Icon-192.png',
+    badge: '/icons/Icon-192.png',
+    data: { url },
+  });
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification?.data?.url || "https://sspapp-71608.web.app";
+  event.waitUntil(clients.openWindow(url));
 });

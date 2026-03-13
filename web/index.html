@@ -2,46 +2,41 @@
 <html>
 <head>
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
+  <meta name="description" content="sspaap">
 
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="sspaap">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
   <link rel="icon" type="image/png" href="favicon.png"/>
-
   <title>sspaap</title>
   <link rel="manifest" href="manifest.json">
 
-  <style>
-    body {
-      background-color: #ffffff;
-    }
-  </style>
-</head>
-<body>
+  <!-- ✅ OneSignal -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <script>
-    // 💡 서비스 워커를 즉시 업데이트하고 제어권을 가져오는 로직
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        navigator.serviceWorker.getRegistrations().then(function (registrations) {
-          for (let registration of registrations) {
-            registration.update();
-            console.log("Service Worker Updated");
-          }
-        });
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "5cd9d939-a06d-4075-a6df-120de458a052",
+        serviceWorkerParam: { scope: "/" },
+
+        // ✅ 절대경로로!
+        serviceWorkerPath: "/OneSignalSDKWorker.js",
+        serviceWorkerUpdaterPath: "/OneSignalSDKUpdaterWorker.js",
       });
-    }
+
+      console.log("[OneSignal] init done");
+    });
   </script>
-  
-  <script src="flutter_bootstrap.js?v=1.0.1" async></script>
+
+  <style> body { background-color:#fff; } </style>
+</head>
+
+<body>
+  <script src="/onesignal_bridge.js"></script>
+  <script src="flutter_bootstrap.js?v=1.0.1"></script>
 </body>
 </html>
