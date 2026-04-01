@@ -3,7 +3,9 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import 'package:excel/excel.dart' hide Border;
+import 'package:excel/excel.dart' as xl;
+// excel 패키지에서 Flutter와 충돌 없는 것들만 직접 사용
+import 'package:excel/excel.dart' show Excel, Sheet, CellIndex, TextCellValue, IntCellValue, DoubleCellValue, CellStyle, ExcelColor, HorizontalAlign, VerticalAlign;
 
 class ExcelExportScreen extends StatefulWidget {
   const ExcelExportScreen({Key? key}) : super(key: key);
@@ -14,9 +16,9 @@ class ExcelExportScreen extends StatefulWidget {
 class _ExcelExportScreenState extends State<ExcelExportScreen> {
   final supabase = Supabase.instance.client;
 
-  static const _bg = Color(0xFFF4F6FB);
+  static const _bg   = Color(0xFFF4F6FB);
   static const _text = Color(0xFF1A1D2E);
-  static const _sub = Color(0xFF8A93B0);
+  static const _sub  = Color(0xFF8A93B0);
 
   final Map<String, bool> _loading = {
     'employees': false,
@@ -25,23 +27,34 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     'leave': false,
     'dorm': false,
   };
-
   final Set<String> _running = {};
 
-  int _year = DateTime.now().year;
+  int _year  = DateTime.now().year;
   int _month = DateTime.now().month;
-
   bool _isDownloading = false;
+
+  // ── 부서 한글 변환
+  static const _deptMap = {
+    'MANAGEMENT': '관리부',
+    'PRODUCTION': '생산관리부',
+    'SALES':      '영업부',
+    'RND':        '연구소',
+    'STEEL':      '스틸생산부',
+    'BOX':        '박스생산부',
+    'DELIVERY':   '포장납품부',
+    'SSG':        '에스에스지',
+    'CLEANING':   '환경미화',
+    'NUTRITION':  '영양사',
+  };
+  String _dept(String? d) => _deptMap[d ?? ''] ?? (d ?? '-');
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text(
-          "엑셀 내보내기",
-          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
-        ),
+        title: const Text("엑셀 내보내기",
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: _text,
@@ -62,7 +75,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
             color: const Color(0xFF2E6BFF),
             icon: Icons.people_rounded,
             title: "직원 목록",
-            desc: "전체 직원 · 부서 · 연차 현황",
+            desc: "전체 직원 · 부서 · 연차 · 국적",
             onTap: _exportEmployees,
           ),
           _card(
@@ -108,38 +121,20 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
+            blurRadius: 8, offset: const Offset(0, 3))],
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF2E6BFF)),
-          const SizedBox(width: 8),
-          const Text(
-            "기준 월",
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _text),
-          ),
-          const Spacer(),
-          _drop<int>(
-            value: _year,
-            items: List.generate(3, (i) => DateTime.now().year - i),
-            label: (v) => '$v년',
-            onChanged: (v) => setState(() => _year = v!),
-          ),
-          const SizedBox(width: 8),
-          _drop<int>(
-            value: _month,
-            items: List.generate(12, (i) => i + 1),
-            label: (v) => '$v월',
-            onChanged: (v) => setState(() => _month = v!),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        const Icon(Icons.calendar_today_rounded, size: 16, color: Color(0xFF2E6BFF)),
+        const SizedBox(width: 8),
+        const Text("기준 월", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _text)),
+        const Spacer(),
+        _drop<int>(value: _year, items: List.generate(3, (i) => DateTime.now().year - i),
+            label: (v) => '$v년', onChanged: (v) => setState(() => _year = v!)),
+        const SizedBox(width: 8),
+        _drop<int>(value: _month, items: List.generate(12, (i) => i + 1),
+            label: (v) => '$v월', onChanged: (v) => setState(() => _month = v!)),
+      ]),
     );
   }
 
@@ -152,83 +147,59 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     required Future<void> Function() onTap,
   }) {
     final busy = _loading[keyName] ?? false;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
+            blurRadius: 8, offset: const Offset(0, 3))],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: _text)),
-                const SizedBox(height: 3),
-                Text(desc, style: const TextStyle(fontSize: 12, color: _sub)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          busy
-              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-              : ElevatedButton.icon(
-                  onPressed: (busy || _isDownloading)
-                      ? null
-                      : () => _runOnce(keyName, () async {
-                            await onTap();
-                          }),
-                  icon: const Icon(Icons.download_rounded, size: 14),
-                  label: const Text("다운로드", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
+      child: Row(children: [
+        Container(padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 22)),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: _text)),
+          const SizedBox(height: 3),
+          Text(desc, style: const TextStyle(fontSize: 12, color: _sub)),
+        ])),
+        const SizedBox(width: 8),
+        busy
+            ? const SizedBox(width: 24, height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5))
+            : ElevatedButton.icon(
+                onPressed: (busy || _isDownloading)
+                    ? null
+                    : () => _runOnce(keyName, onTap),
+                icon: const Icon(Icons.download_rounded, size: 14),
+                label: const Text("다운로드",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-        ],
-      ),
+              ),
+      ]),
     );
   }
 
   Widget _drop<T>({
-    required T value,
-    required List<T> items,
-    required String Function(T) label,
-    required void Function(T?) onChanged,
+    required T value, required List<T> items,
+    required String Function(T) label, required void Function(T?) onChanged,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: _bg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE0E5F0)),
-      ),
+      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE0E5F0))),
       child: DropdownButton<T>(
-        value: value,
-        underline: const SizedBox(),
-        isDense: true,
+        value: value, underline: const SizedBox(), isDense: true,
         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _text),
         items: items.map((e) => DropdownMenuItem(value: e, child: Text(label(e)))).toList(),
         onChanged: onChanged,
@@ -243,33 +214,48 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
   Future<void> _runOnce(String key, Future<void> Function() job) async {
     if (_running.contains(key)) return;
     _running.add(key);
-    try {
-      await job();
-    } finally {
-      _running.remove(key);
-    }
+    try { await job(); } finally { _running.remove(key); }
   }
 
   void _err(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w700)),
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(fontWeight: FontWeight.w700)),
+      backgroundColor: Colors.redAccent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    ));
   }
 
-  void _headers(Sheet s, List<String> hs) {
+  // ── 헤더 (컬러 배경 + 흰 굵은 글씨 + 테두리)
+  void _headers(Sheet s, List<String> hs, {String hexColor = 'FF2E6BFF'}) {
     for (var i = 0; i < hs.length; i++) {
-      s.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).value = TextCellValue(hs[i]);
+      final cell = s.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      cell.value = TextCellValue(hs[i]);
+      cell.cellStyle = CellStyle(
+        bold: true,
+        fontSize: 11,
+        fontColorHex: ExcelColor.fromHexString('FFFFFFFF'),
+        backgroundColorHex: ExcelColor.fromHexString(hexColor),
+        horizontalAlign: HorizontalAlign.Center,
+        verticalAlign: VerticalAlign.Center,
+        leftBorder:   xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFCFD8DC')),
+        rightBorder:  xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFCFD8DC')),
+        bottomBorder: xl.Border(borderStyle: xl.BorderStyle.Medium,
+            borderColorHex: ExcelColor.fromHexString('FF000000')),
+        topBorder:    xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFCFD8DC')),
+      );
     }
   }
 
+  // ── 데이터 행 (줄 교차 배경 + 테두리)
   void _row(Sheet s, int r, List<dynamic> vals) {
+    final isEven = r % 2 == 0;
+    final bgHex  = isEven ? 'FFF5F7FF' : 'FFFFFFFF';
     for (var i = 0; i < vals.length; i++) {
       final cell = s.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: r));
       final v = vals[i];
@@ -278,37 +264,47 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
           : v is double
               ? DoubleCellValue(v)
               : TextCellValue(v?.toString() ?? '-');
+      cell.cellStyle = CellStyle(
+        fontSize: 10,
+        backgroundColorHex: ExcelColor.fromHexString(bgHex),
+        horizontalAlign: v is num ? HorizontalAlign.Center : HorizontalAlign.Left,
+        verticalAlign: VerticalAlign.Center,
+        leftBorder:   xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFE0E5F0')),
+        rightBorder:  xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFE0E5F0')),
+        bottomBorder: xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFE0E5F0')),
+        topBorder:    xl.Border(borderStyle: xl.BorderStyle.Thin,
+            borderColorHex: ExcelColor.fromHexString('FFE0E5F0')),
+      );
     }
+  }
+
+  // ── 행 높이 설정 헬퍼
+  void _rowHeights(Sheet s, int rowCount,
+      {double header = 22, double data = 18}) {
+    s.setRowHeight(0, header);
+    for (var i = 1; i <= rowCount; i++) s.setRowHeight(i, data);
   }
 
   void _widths(Sheet s, List<double> ws) {
-    for (var i = 0; i < ws.length; i++) {
-      s.setColumnWidth(i, ws[i]);
-    }
+    for (var i = 0; i < ws.length; i++) s.setColumnWidth(i, ws[i]);
   }
 
-  // ✅ 핵심 수정 부분: excel.save() 대신 excel.encode() 사용
   void _download(Excel excel, String name) {
     if (_isDownloading) return;
-    
     setState(() => _isDownloading = true);
-
     String? url;
     try {
-      // ✅ 중요: .save()는 웹에서 자동 다운로드를 유발하므로 .encode()를 사용합니다.
-      final bytes = excel.encode(); 
+      final bytes = excel.encode();
       if (bytes == null) throw Exception('저장 실패');
-
-      final blob = html.Blob(
-        [bytes],
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
+      final blob = html.Blob([bytes],
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       url = html.Url.createObjectUrlFromBlob(blob);
-
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download', name)
         ..style.display = 'none';
-
       html.document.body!.append(anchor);
       anchor.click();
       anchor.remove();
@@ -316,7 +312,6 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       _err('파일 다운로드 중 오류가 발생했습니다.');
     } finally {
       if (url != null) html.Url.revokeObjectUrl(url);
-
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) setState(() => _isDownloading = false);
       });
@@ -330,39 +325,46 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     return '$_year-${_month.toString().padLeft(2, '0')}-${last.toString().padLeft(2, '0')}';
   }
 
-  // 1. 직원 목록
+  // ── 1. 직원 목록 (국적 + 부서 한글)
   Future<void> _exportEmployees() async {
     if (_loading['employees'] == true) return;
     _busy('employees', true);
     try {
       final rows = await supabase
           .from('profiles')
-          .select('full_name, dept_category, role, total_leave, used_leave')
+          .select('full_name, dept_category, position, role, total_leave, used_leave, nationality, email')
+          .order('dept_category', ascending: true)
           .order('full_name', ascending: true);
 
       final excel = Excel.createExcel();
       final s = excel['직원목록'];
       excel.delete('Sheet1');
 
-      _headers(s, ['이름', '부서', '권한', '전체연차(일)', '사용연차(일)', '잔여연차(일)']);
-      _widths(s, [13, 14, 9, 13, 13, 13]);
+      _headers(s, ['이름', '부서', '직책', '권한', '국적', '이메일',
+          '전체연차(일)', '사용연차(일)', '잔여연차(일)'], hexColor: 'FF1565C0');
+      _widths(s, [13, 14, 10, 9, 12, 24, 13, 13, 13]);
 
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
         final total = (r['total_leave'] as num?)?.toDouble() ?? 0;
-        final used = (r['used_leave'] as num?)?.toDouble() ?? 0;
+        final used  = (r['used_leave']  as num?)?.toDouble() ?? 0;
 
         _row(s, i + 1, [
-          r['full_name'] ?? '-',
-          r['dept_category'] ?? '-',
+          r['full_name']    ?? '-',
+          _dept(r['dept_category'] as String?),   // 한글 변환
+          r['position']     ?? '-',
           r['role'] == 'ADMIN' ? '관리자' : '직원',
+          r['nationality']  ?? '-',               // 국적
+          r['email']        ?? '-',
           total,
           used,
           total - used,
         ]);
       }
 
-      _download(excel, '직원목록_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
+      _rowHeights(s, rows.length);
+      _download(excel,
+          '직원목록_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
     } catch (e) {
       _err('직원 목록 실패: $e');
     } finally {
@@ -370,7 +372,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  // 2. 근태 기록
+  // ── 2. 근태 기록 (부서 한글)
   Future<void> _exportAttendance() async {
     if (_loading['attendance'] == true) return;
     _busy('attendance', true);
@@ -386,21 +388,23 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       final s = excel['근태기록'];
       excel.delete('Sheet1');
 
-      _headers(s, ['이름', '부서', '날짜', '출근', '퇴근']);
+      _headers(s, ['이름', '부서', '날짜', '출근', '퇴근'], hexColor: 'FF2E7D32');
       _widths(s, [13, 13, 14, 10, 10]);
 
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
         _row(s, i + 1, [
-          r['full_name'] ?? '-',
-          r['dept_category'] ?? '-',
-          r['work_date'] ?? '-',
-          r['check_in'] ?? '-',
-          r['check_out'] ?? '-',
+          r['full_name']    ?? '-',
+          _dept(r['dept_category'] as String?),
+          r['work_date']    ?? '-',
+          r['check_in']     ?? '-',
+          r['check_out']    ?? '-',
         ]);
       }
 
-      _download(excel, '근태기록_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
+      _rowHeights(s, rows.length);
+      _download(excel,
+          '근태기록_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
     } catch (e) {
       _err('근태 기록 실패: $e');
     } finally {
@@ -408,15 +412,16 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  // 3. 식수 현황
+  // ── 3. 식수 현황 (부서 한글)
   Future<void> _exportMeal() async {
     if (_loading['meal'] == true) return;
     _busy('meal', true);
     try {
       final results = await Future.wait([
-        supabase.from('profiles').select('id, full_name, dept_category').order('full_name', ascending: true),
-        supabase
-            .from('meal_requests')
+        supabase.from('profiles')
+            .select('id, full_name, dept_category')
+            .order('full_name', ascending: true),
+        supabase.from('meal_requests')
             .select('user_id, full_name, dept_category, meal_date, meal_type, is_eating')
             .gte('meal_date', _monthFrom)
             .lte('meal_date', _monthTo)
@@ -424,46 +429,55 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       ]);
 
       final profiles = List<Map<String, dynamic>>.from(results[0] as List);
-      final meals = List<Map<String, dynamic>>.from(results[1] as List);
-      final lastDay = DateUtils.getDaysInMonth(_year, _month);
+      final meals    = List<Map<String, dynamic>>.from(results[1] as List);
+      final lastDay  = DateUtils.getDaysInMonth(_year, _month);
 
       final excel = Excel.createExcel();
       final s1 = excel['개인별 집계'];
       excel.delete('Sheet1');
-      _headers(s1, ['이름', '부서', '점심(식사)', '점심(불참)', '저녁(식사)', '저녁(불참)', '미응답', '참여율']);
-      _widths(s1, [12, 12, 12, 12, 12, 12, 10, 10]);
+
+      _headers(s1, ['이름', '부서', '점심(식사)', '점심(불참)',
+          '저녁(식사)', '저녁(불참)', '미응답', '참여율'], hexColor: 'FFE65100');
+      _widths(s1, [12, 14, 12, 12, 12, 12, 10, 10]);
 
       for (var i = 0; i < profiles.length; i++) {
-        final p = profiles[i];
+        final p  = profiles[i];
         final my = meals.where((r) => r['user_id'] == p['id']).toList();
-        final le = my.where((r) => r['meal_type'] == 'LUNCH' && r['is_eating'] == true).length;
-        final ln = my.where((r) => r['meal_type'] == 'LUNCH' && r['is_eating'] == false).length;
+        final le = my.where((r) => r['meal_type'] == 'LUNCH'  && r['is_eating'] == true).length;
+        final ln = my.where((r) => r['meal_type'] == 'LUNCH'  && r['is_eating'] == false).length;
         final de = my.where((r) => r['meal_type'] == 'DINNER' && r['is_eating'] == true).length;
         final dn = my.where((r) => r['meal_type'] == 'DINNER' && r['is_eating'] == false).length;
-
-        final total = lastDay * 2;
+        final total     = lastDay * 2;
         final responded = le + ln + de + dn;
-        final rate = total > 0 ? '${(responded / total * 100).toStringAsFixed(1)}%' : '-';
+        final rate = total > 0
+            ? '${(responded / total * 100).toStringAsFixed(1)}%' : '-';
 
-        _row(s1, i + 1, [p['full_name'], p['dept_category'], le, ln, de, dn, total - responded, rate]);
+        _row(s1, i + 1, [
+          p['full_name'],
+          _dept(p['dept_category'] as String?),
+          le, ln, de, dn, total - responded, rate,
+        ]);
       }
 
       final s2 = excel['일별 원본'];
-      _headers(s2, ['날짜', '이름', '부서', '구분', '식사여부']);
-      _widths(s2, [14, 12, 12, 8, 10]);
+      _headers(s2, ['날짜', '이름', '부서', '구분', '식사여부'], hexColor: 'FFBF360C');
+      _widths(s2, [14, 12, 14, 8, 10]);
 
       for (var i = 0; i < meals.length; i++) {
         final r = meals[i];
         _row(s2, i + 1, [
-          r['meal_date'] ?? '-',
-          r['full_name'] ?? '-',
-          r['dept_category'] ?? '-',
+          r['meal_date']    ?? '-',
+          r['full_name']    ?? '-',
+          _dept(r['dept_category'] as String?),
           r['meal_type'] == 'LUNCH' ? '점심' : '저녁',
           r['is_eating'] == true ? '식사' : '불참',
         ]);
       }
 
-      _download(excel, '식수현황_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
+      _rowHeights(s1, profiles.length);
+      _rowHeights(s2, meals.length);
+      _download(excel,
+          '식수현황_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
     } catch (e) {
       _err('식수 현황 실패: $e');
     } finally {
@@ -471,14 +485,14 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  // 4. 휴가 신청
+  // ── 4. 휴가 신청 (부서 한글)
   Future<void> _exportLeave() async {
     if (_loading['leave'] == true) return;
     _busy('leave', true);
     try {
       final rows = await supabase
           .from('leave_requests')
-          .select('full_name, start_date, end_date, leave_days, leave_type, reason, status')
+          .select('full_name, dept_category, start_date, end_date, leave_days, leave_type, reason, status')
           .gte('start_date', _monthFrom)
           .lte('start_date', _monthTo)
           .order('start_date', ascending: true);
@@ -487,36 +501,39 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       final s = excel['휴가내역'];
       excel.delete('Sheet1');
 
-      _headers(s, ['이름', '시작일', '종료일', '일수', '구분', '사유', '상태']);
-      _widths(s, [12, 14, 14, 8, 10, 24, 9]);
+      _headers(s, ['이름', '부서', '시작일', '종료일', '일수', '구분', '사유', '상태'], hexColor: 'FF006064');
+      _widths(s, [12, 14, 14, 14, 8, 10, 24, 9]);
 
       String typeLabel(t) => switch (t) {
-            'HALF' => '반차',
+            'HALF'   => '반차',
             'PUBLIC' => '공가',
-            'EVENT' => '경조사',
-            _ => '연차',
+            'EVENT'  => '경조사',
+            'SICK'   => '병가',
+            _        => '연차',
           };
-
       String stLabel(s) => switch (s) {
             'APPROVED' => '승인',
             'REJECTED' => '반려',
-            _ => '대기',
+            _          => '대기',
           };
 
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;
         _row(s, i + 1, [
-          r['full_name'] ?? '-',
+          r['full_name']  ?? '-',
+          _dept(r['dept_category'] as String?),
           r['start_date'] ?? '-',
-          r['end_date'] ?? '-',
+          r['end_date']   ?? '-',
           (r['leave_days'] as num?)?.toDouble() ?? 0.0,
           typeLabel(r['leave_type'] ?? ''),
-          r['reason'] ?? '-',
+          r['reason']     ?? '-',
           stLabel(r['status'] ?? ''),
         ]);
       }
 
-      _download(excel, '휴가내역_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
+      _rowHeights(s, rows.length);
+      _download(excel,
+          '휴가내역_${_ym}_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
     } catch (e) {
       _err('휴가 내역 실패: $e');
     } finally {
@@ -524,7 +541,7 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
     }
   }
 
-  // 5. 기숙사 현황
+  // ── 5. 기숙사 현황 (부서 한글 + 국적)
   Future<void> _exportDorm() async {
     if (_loading['dorm'] == true) return;
     _busy('dorm', true);
@@ -532,16 +549,17 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       final results = await Future.wait([
         supabase.from('dorm_residents').select('*').order('room_id', ascending: true),
         supabase.from('dorm_rooms').select('*').order('room_number', ascending: true),
-        supabase.from('profiles').select('id, dept_category').order('id', ascending: true),
+        supabase.from('profiles').select('id, dept_category, nationality').order('id'),
       ]);
 
       final residents = List<Map<String, dynamic>>.from(results[0] as List);
-      final rooms = List<Map<String, dynamic>>.from(results[1] as List);
-      final profiles = List<Map<String, dynamic>>.from(results[2] as List);
-      final roomMap = {for (final r in rooms) (r['id'] as String): r};
+      final rooms     = List<Map<String, dynamic>>.from(results[1] as List);
+      final profiles  = List<Map<String, dynamic>>.from(results[2] as List);
+      final roomMap   = {for (final r in rooms) (r['id'] as String): r};
 
       String pickDate(Map<String, dynamic> r) {
-        final v = r['created_at'] ?? r['move_in_date'] ?? r['move_in_at'] ?? r['check_in_date'] ?? r['inserted_at'] ?? r['date'] ?? r['createdAt'];
+        final v = r['created_at'] ?? r['move_in_date'] ?? r['move_in_at']
+            ?? r['check_in_date'] ?? r['inserted_at'] ?? r['entry_date'];
         if (v == null) return '-';
         final s = v.toString();
         return s.length >= 10 ? s.substring(0, 10) : s;
@@ -550,29 +568,40 @@ class _ExcelExportScreenState extends State<ExcelExportScreen> {
       final excel = Excel.createExcel();
       final s1 = excel['입주자 현황'];
       excel.delete('Sheet1');
-      _headers(s1, ['호실', '이름', '부서', '입주일']);
-      _widths(s1, [9, 12, 14, 14]);
+
+      _headers(s1, ['호실', '이름', '부서', '국적', '입주일'], hexColor: 'FF4A148C');
+      _widths(s1, [14, 12, 14, 12, 14]);
 
       for (var i = 0; i < residents.length; i++) {
-        final r = residents[i];
+        final r    = residents[i];
         final room = roomMap[r['room_id']];
-        final dept = profiles.firstWhere((p) => p['id'] == r['user_id'], orElse: () => {})['dept_category'] ?? '-';
-        _row(s1, i + 1, ['${room?['room_number'] ?? '-'}호', r['resident_name'] ?? '-', dept, pickDate(r)]);
+        final prof = profiles.firstWhere(
+            (p) => p['id'] == r['user_id'], orElse: () => {});
+        _row(s1, i + 1, [
+          room?['room_number'] ?? '-',
+          r['resident_name'] ?? '-',
+          _dept(prof['dept_category'] as String?),
+          prof['nationality'] ?? '-',
+          pickDate(r),
+        ]);
       }
 
       final s2 = excel['호실 현황'];
-      _headers(s2, ['호실', '정원', '현재인원', '빈자리']);
-      _widths(s2, [9, 10, 10, 8]);
+      _headers(s2, ['호실', '정원', '현재인원', '빈자리'], hexColor: 'FF6A1B9A');
+      _widths(s2, [14, 10, 10, 8]);
 
       for (var i = 0; i < rooms.length; i++) {
-        final room = rooms[i];
+        final room    = rooms[i];
         final current = residents.where((r) => r['room_id'] == room['id']).length;
-        final capRaw = room['max_capacity'] ?? room['capacity'] ?? room['cap'];
-        final cap = (capRaw is num) ? capRaw.toInt() : 0;
-        _row(s2, i + 1, ['${room['room_number'] ?? '-'}호', cap, current, cap - current]);
+        final capRaw  = room['max_capacity'] ?? room['capacity'] ?? room['cap'];
+        final cap     = (capRaw is num) ? capRaw.toInt() : 0;
+        _row(s2, i + 1, [room['room_number'] ?? '-', cap, current, cap - current]);
       }
 
-      _download(excel, '기숙사현황_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
+      _rowHeights(s1, residents.length);
+      _rowHeights(s2, rooms.length);
+      _download(excel,
+          '기숙사현황_${DateFormat('yyyyMMdd').format(DateTime.now())}.xlsx');
     } catch (e) {
       _err('기숙사 현황 실패: $e');
     } finally {

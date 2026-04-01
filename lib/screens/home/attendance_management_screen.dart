@@ -5,9 +5,11 @@ import 'attendance_helper.dart';
 import 'attendance_tab.dart';
 import 'leave_status_tab.dart';
 import 'leave_history_tab.dart';
+import 'leave_realtime_tab.dart';
 
 class AttendanceManagementScreen extends StatefulWidget {
-  const AttendanceManagementScreen({Key? key}) : super(key: key);
+  final bool isManager; // 매니저 이상이면 전체 탭, 사원이면 실시간 탭만
+  const AttendanceManagementScreen({Key? key, this.isManager = false}) : super(key: key);
 
   @override
   State<AttendanceManagementScreen> createState() =>
@@ -21,17 +23,21 @@ class _AttendanceManagementScreenState
   late TabController _tabController;
 
   bool _isLoading   = true;
-  bool _canApprove  = false; // 과장급 이상만 true
+  bool _canApprove  = false;
   List<Map<String, dynamic>> _dailyAttendance = [];
   List<Map<String, dynamic>> _leaveRequests   = [];
   List<Map<String, dynamic>> _onLeaveNow      = [];
+  List<Map<String, dynamic>> _upcomingLeaves  = [];
   List<Map<String, dynamic>> _leaveHistory    = [];
   Map<String, List<Map<String, dynamic>>> _profilesByDept = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // 매니저: 출퇴근 + 실시간 + 휴가현황 + 연차기록 (4탭)
+    // 사원:   실시간 탭만 (1탭)
+    _tabController = TabController(
+        length: widget.isManager ? 4 : 1, vsync: this);
     _refreshData();
   }
 
@@ -83,6 +89,7 @@ class _AttendanceManagementScreenState
           .single();
       final myPosition = myProfile['position'] as String? ?? '';
       final myRole     = myProfile['role']     as String? ?? '';
+      final myDept     = myProfile['dept_category'] as String? ?? '';
 
       const step1Ranks = ['과장', '차장', '부장'];
       const step2Ranks = ['이사', '본부장', '대표이사'];
@@ -90,14 +97,6 @@ class _AttendanceManagementScreenState
       _canApprove = isAdmin || step1Ranks.contains(myPosition) || step2Ranks.contains(myPosition);
 
       List<Map<String, dynamic>> data = [];
-
-      // 내 부서도 조회
-      final myDept = myProfile['dept_category'] as String? ?? '';
-
-      debugPrint("=== _fetchLeaveRequests ===");
-      debugPrint("myPosition: $myPosition / myRole: $myRole / myDept: $myDept");
-      debugPrint("step1Ranks.contains: ${step1Ranks.contains(myPosition)}");
-      debugPrint("step2Ranks.contains: ${step2Ranks.contains(myPosition)}");
 
       if (isAdmin) {
         // 어드민: 전체 PENDING
@@ -107,8 +106,9 @@ class _AttendanceManagementScreenState
             .eq('status', 'PENDING')
             .order('created_at', ascending: false);
         data = List<Map<String, dynamic>>.from(rows);
+
       } else if (step1Ranks.contains(myPosition)) {
-        // 과장/차장/부장: 같은 부서의 step1 PENDING 건만
+        // 과장/차장/부장: 같은 부서 step1 PENDING 건만
         final rows = await supabase
             .from('leave_requests')
             .select()
@@ -117,25 +117,45 @@ class _AttendanceManagementScreenState
             .eq('dept_category', myDept)
             .order('created_at', ascending: false);
         data = List<Map<String, dynamic>>.from(rows);
+
       } else if (step2Ranks.contains(myPosition)) {
-        debugPrint("=== 본부장 분기 진입 ===");
-        debugPrint("myPosition: '$myPosition'");
-        debugPrint("step2Ranks: $step2Ranks");
-        // 이사/본부장/대표이사: step1 완료 후 step2 대기 건 (부서 무관, 전체)
-        final rows = await supabase
+        // 이사/본부장/대표이사:
+        // 1순위 - step2_approver_id가 나로 지정된 건
+        final byId = await supabase
             .from('leave_requests')
             .select()
             .eq('status', 'PENDING')
             .eq('step1_status', 'APPROVED')
             .eq('step2_status', 'PENDING')
+            .eq('step2_approver_id', user.id)
             .order('created_at', ascending: false);
-        debugPrint("결과 건수: ${rows.length}");
-        data = List<Map<String, dynamic>>.from(rows);
+
+        if (byId.isNotEmpty) {
+          data = List<Map<String, dynamic>>.from(byId);
+        } else {
+          // 2순위 - step2_approver_id 미설정(구버전) 데이터: 부서 기반으로 fallback
+          // 직급에 따라 담당 부서 결정
+          final myStep2Dept = switch (myPosition) {
+            '이사'    => 'PRODUCTION',
+            '대표이사' => 'MANAGEMENT',
+            _        => myDept,
+          };
+          final byDept = await supabase
+              .from('leave_requests')
+              .select()
+              .eq('status', 'PENDING')
+              .eq('step1_status', 'APPROVED')
+              .eq('step2_status', 'PENDING')
+              .eq('dept_category', myStep2Dept)
+              .isFilter('step2_approver_id', null) // approver_id 미설정 건만
+              .order('created_at', ascending: false);
+          data = List<Map<String, dynamic>>.from(byDept);
+        }
       }
 
       _leaveRequests = data;
     } catch (e) {
-      debugPrint("휴가 신청 로드 실패: \$e");
+      debugPrint("휴가 신청 로드 실패: $e");
     }
   }
 
@@ -155,6 +175,15 @@ class _AttendanceManagementScreenState
           .lte('start_date', today)
           .gte('end_date', today);
 
+      // 오늘 이후 예정된 휴가 (7일 이내)
+      final upcoming = await supabase
+          .from('leave_requests')
+          .select()
+          .eq('status', 'APPROVED')
+          .gt('start_date', today)
+          .order('start_date', ascending: true)
+          .limit(30);
+
       final history = await supabase
           .from('leave_requests')
           .select()
@@ -162,8 +191,9 @@ class _AttendanceManagementScreenState
           .gte('start_date', yearStart)
           .order('start_date', ascending: false);
 
-      _onLeaveNow   = List<Map<String, dynamic>>.from(activeLeave);
-      _leaveHistory = List<Map<String, dynamic>>.from(history);
+      _onLeaveNow      = List<Map<String, dynamic>>.from(activeLeave);
+      _upcomingLeaves  = List<Map<String, dynamic>>.from(upcoming);
+      _leaveHistory    = List<Map<String, dynamic>>.from(history);
 
       _profilesByDept = {};
       for (final p in List<Map<String, dynamic>>.from(profiles)) {
@@ -181,7 +211,6 @@ class _AttendanceManagementScreenState
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // 현재 요청 데이터 조회
       final req = await supabase
           .from('leave_requests')
           .select()
@@ -191,7 +220,6 @@ class _AttendanceManagementScreenState
       final step1Status = req['step1_status'] as String? ?? 'PENDING';
       final now  = DateTime.now().toIso8601String();
 
-      // 내 직급 조회
       final myProfile = await supabase
           .from('profiles')
           .select('position, role, dept_category')
@@ -207,27 +235,41 @@ class _AttendanceManagementScreenState
 
       if (newStatus == 'REJECTED') {
         if (isStep1Actor && step1Status == 'PENDING') {
-          updateData = {'status': 'REJECTED', 'step1_status': 'REJECTED', 'step1_at': now};
+          updateData = {
+            'status': 'REJECTED',
+            'step1_status': 'REJECTED',
+            'step1_at': now,
+          };
         } else {
-          updateData = {'status': 'REJECTED', 'step2_status': 'REJECTED', 'step2_at': now};
+          updateData = {
+            'status': 'REJECTED',
+            'step2_status': 'REJECTED',
+            'step2_at': now,
+          };
         }
       } else if (newStatus == 'APPROVED') {
-        if (isStep1Actor && step1Status == 'PENDING') {
-          // step1 승인 → step2 PENDING으로
+        if (isAdmin) {
+          updateData = {
+            'status': 'APPROVED',
+            'step1_status': 'APPROVED',
+            'step2_status': 'APPROVED',
+            'step1_at': now,
+            'step2_at': now,
+          };
+        } else if (isStep1Actor && step1Status == 'PENDING') {
+          // step1 승인 → step2 PENDING
           updateData = {
             'step1_status': 'APPROVED',
             'step1_at': now,
             'step2_status': 'PENDING',
           };
-        } else if (!isStep1Actor || step1Status == 'APPROVED') {
+        } else {
           // step2 최종 승인
           updateData = {
             'step2_status': 'APPROVED',
             'step2_at': now,
             'status': 'APPROVED',
           };
-        } else if (isAdmin) {
-          updateData = {'status': 'APPROVED', 'step1_status': 'APPROVED', 'step2_status': 'APPROVED'};
         }
       }
 
@@ -256,83 +298,130 @@ class _AttendanceManagementScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isManager = widget.isManager;
+
+    // ── 탭 목록 ──
+    final tabs = <Widget>[
+      if (isManager)
+        const Tab(
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.punch_clock_rounded, size: 16),
+            SizedBox(width: 4),
+            Text("출퇴근", style: TextStyle(fontSize: 13)),
+          ]),
+        ),
+      Tab(
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.flight_takeoff_rounded, size: 16),
+          const SizedBox(width: 4),
+          const Text("실시간", style: TextStyle(fontSize: 13)),
+          if (_onLeaveNow.isNotEmpty) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                  color: Colors.indigo,
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text("${_onLeaveNow.length}",
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ]),
+      ),
+      if (isManager) ...[
+        Tab(
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            const Icon(Icons.beach_access_rounded, size: 16),
+            const SizedBox(width: 4),
+            const Text("휴가 현황", style: TextStyle(fontSize: 13)),
+            if (_leaveRequests.isNotEmpty) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(8)),
+                child: Text("${_leaveRequests.length}",
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ]),
+        ),
+        const Tab(
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.history_rounded, size: 16),
+            SizedBox(width: 4),
+            Text("연차 기록", style: TextStyle(fontSize: 13)),
+          ]),
+        ),
+      ],
+    ];
+
+    // ── 탭 콘텐츠 ──
+    final tabViews = <Widget>[
+      if (isManager)
+        AttendanceTab(
+          dailyAttendance: _dailyAttendance,
+          profilesByDept:  _profilesByDept,
+          onLeaveNow:      _onLeaveNow,
+          onRefresh: _refreshData,
+        ),
+      LeaveRealtimeTab(
+        onLeaveToday:   _onLeaveNow,
+        upcomingLeaves: _upcomingLeaves,
+        onRefresh:      _refreshData,
+      ),
+      if (isManager) ...[
+        LeaveStatusTab(
+          leaveRequests:  _leaveRequests,
+          onLeaveNow:     _onLeaveNow,
+          profilesByDept: _profilesByDept,
+          onRefresh:      _refreshData,
+          onUpdateStatus: _updateRequestStatus,
+          canApprove:     _canApprove,
+        ),
+        LeaveHistoryTab(
+          leaveHistory: _leaveHistory,
+          onRefresh:    _refreshData,
+        ),
+      ],
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       appBar: AppBar(
-        title: const Text("근태 통합 관제",
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        title: Text(isManager ? "근태 통합 관제" : "휴가 실시간 현황",
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0.5,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF2E6BFF),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF2E6BFF),
-          indicatorWeight: 3,
-          tabs: [
-            const Tab(
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.punch_clock_rounded, size: 16),
-                SizedBox(width: 4),
-                Text("출퇴근", style: TextStyle(fontSize: 13)),
-              ]),
-            ),
-            Tab(
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                const Icon(Icons.beach_access_rounded, size: 16),
-                const SizedBox(width: 4),
-                const Text("휴가 현황", style: TextStyle(fontSize: 13)),
-                if (_leaveRequests.isNotEmpty) ...[
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.circular(8)),
-                    child: Text("${_leaveRequests.length}",
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ]),
-            ),
-            const Tab(
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.history_rounded, size: 16),
-                SizedBox(width: 4),
-                Text("연차 기록", style: TextStyle(fontSize: 13)),
-              ]),
-            ),
-          ],
-        ),
+        bottom: isManager
+            ? TabBar(
+                controller: _tabController,
+                labelColor: const Color(0xFF2E6BFF),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: const Color(0xFF2E6BFF),
+                indicatorWeight: 3,
+                tabs: tabs,
+              )
+            : null, // 사원은 탭바 숨김 (탭 1개라 불필요)
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                AttendanceTab(
-                  dailyAttendance: _dailyAttendance,
-                  onRefresh: _refreshData,
-                ),
-                LeaveStatusTab(
-                  leaveRequests:  _leaveRequests,
-                  onLeaveNow:     _onLeaveNow,
-                  profilesByDept: _profilesByDept,
+          : isManager
+              ? TabBarView(controller: _tabController, children: tabViews)
+              : LeaveRealtimeTab(  // 사원은 바로 실시간 탭만 표시
+                  onLeaveToday:   _onLeaveNow,
+                  upcomingLeaves: _upcomingLeaves,
                   onRefresh:      _refreshData,
-                  onUpdateStatus: _updateRequestStatus,
-                  canApprove:     _canApprove,
                 ),
-                LeaveHistoryTab(
-                  leaveHistory: _leaveHistory,
-                  onRefresh:    _refreshData,
-                ),
-              ],
-            ),
     );
   }
 }

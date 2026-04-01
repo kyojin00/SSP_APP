@@ -5,6 +5,8 @@ import 'dorm_admin_assign_screen.dart';
 import 'dorm_employee_screen.dart';
 import 'dorm_repair_screen.dart';
 import 'demerit_list_screen.dart';
+import 'lang_context.dart';
+import 'app_strings.dart';
 
 class DormManagementScreen extends StatefulWidget {
   final bool isAdmin;
@@ -25,7 +27,6 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
 
   static const _bg      = Color(0xFFEBF2FF);
   static const _text    = Color(0xFF1A1D2E);
-  static const _sub     = Color(0xFF8A93B0);
   static const _primary = Color(0xFF2E6BFF);
 
   Future<Map<String, int>> _getDormStats() async {
@@ -33,18 +34,18 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
       final rooms = await supabase
           .from('dorm_rooms')
           .select('max_capacity, current_occupancy');
-      int totalRooms        = rooms.length;
-      int currentResidents  = 0;
-      int maxTotalCapacity  = 0;
+      int totalRooms       = rooms.length;
+      int currentResidents = 0;
+      int maxTotalCapacity = 0;
       for (var room in rooms) {
         currentResidents += (room['current_occupancy'] as int? ?? 0);
         maxTotalCapacity  += (room['max_capacity']      as int? ?? 0);
       }
       return {
-        'totalRooms':      totalRooms,
+        'totalRooms':       totalRooms,
         'currentResidents': currentResidents,
-        'remainingSeats':  maxTotalCapacity - currentResidents,
-        'maxCapacity':     maxTotalCapacity,
+        'remainingSeats':   maxTotalCapacity - currentResidents,
+        'maxCapacity':      maxTotalCapacity,
       };
     } catch (e) {
       return {'totalRooms': 0, 'currentResidents': 0, 'remainingSeats': 0, 'maxCapacity': 0};
@@ -81,86 +82,72 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: Stack(
-                  children: [
-                    // 배경 장식 원
-                    Positioned(
-                      right: -30, top: -20,
-                      child: Container(
-                        width: 180, height: 180,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.04),
-                        ),
+                child: Stack(children: [
+                  Positioned(
+                    right: -30, top: -20,
+                    child: Container(
+                      width: 180, height: 180,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.04),
                       ),
                     ),
-                    Positioned(
-                      right: 40, bottom: -40,
-                      child: Container(
-                        width: 120, height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.06),
-                        ),
+                  ),
+                  Positioned(
+                    right: 40, bottom: -40,
+                    child: Container(
+                      width: 120, height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.06),
                       ),
                     ),
-                    // 환영 텍스트
-                    Positioned(
-                      left: 20, bottom: 24,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isAdmin)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: _primary.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: _primary.withOpacity(0.5)),
-                              ),
-                              child: const Text("ADMIN",
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1)),
+                  ),
+                  Positioned(
+                    left: 20, bottom: 24,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isAdmin)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _primary.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: _primary.withOpacity(0.5)),
                             ),
-                          Text("$name님,",
-                              style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w500)),
-                          const SizedBox(height: 2),
-                          Text(
-                            isAdmin ? "관리자 모드입니다." : "반갑습니다!",
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.5),
+                            child: const Text("ADMIN",
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 10,
+                                    fontWeight: FontWeight.w900, letterSpacing: 1)),
                           ),
-                        ],
-                      ),
+                        Text("$name${context.tr(AppStrings.dormHub).contains('님') ? '님,' : ','}",
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 15,
+                                fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 2),
+                        Text(
+                          isAdmin ? "ADMIN" : context.tr(AppStrings.dormHub),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 24,
+                              fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                        ),
+                      ],
                     ),
-                    // 기숙사 아이콘
-                    Positioned(
-                      right: 20, bottom: 20,
-                      child: Icon(Icons.apartment_rounded,
-                          size: 64,
-                          color: Colors.white.withOpacity(0.1)),
-                    ),
-                  ],
-                ),
+                  ),
+                  Positioned(
+                    right: 20, bottom: 20,
+                    child: Icon(Icons.apartment_rounded,
+                        size: 64, color: Colors.white.withOpacity(0.1)),
+                  ),
+                ]),
               ),
             ),
-            // 축소 시 제목
-            title: const Text("기숙사 허브",
-                style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    color: Colors.white)),
+            title: Text(context.tr(AppStrings.dormHub),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
           ),
 
           // ─── 바디 ───
@@ -170,14 +157,12 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 관리자: 실시간 현황
                   if (isAdmin) ...[
                     _sectionHeader("📊 실시간 시설 현황"),
                     const SizedBox(height: 12),
                     _buildOccupancySummary(),
                     const SizedBox(height: 28),
                   ],
-
                   _sectionHeader("⚙️ 주요 서비스"),
                   const SizedBox(height: 14),
                   _buildMenuGrid(context),
@@ -190,7 +175,6 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
     );
   }
 
-  // ── 실시간 현황 카드 ──
   Widget _buildOccupancySummary() {
     return FutureBuilder<Map<String, int>>(
       future: _getDormStats(),
@@ -206,26 +190,22 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF1E293B), Color(0xFF334155)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                  color: const Color(0xFF1E293B).withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8))
-            ],
+            boxShadow: [BoxShadow(
+                color: const Color(0xFF1E293B).withOpacity(0.3),
+                blurRadius: 20, offset: const Offset(0, 8))],
           ),
           child: Column(children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _statItem("전체 호실", "${stats['totalRooms']}", "개"),
+                _statItem(context, "전체 호실", "${stats['totalRooms']}", "개"),
                 Container(width: 1, height: 40, color: Colors.white.withOpacity(0.15)),
-                _statItem("거주 인원", "$residents", "명"),
+                _statItem(context, "거주 인원", "$residents", context.tr(AppStrings.members)),
                 Container(width: 1, height: 40, color: Colors.white.withOpacity(0.15)),
-                _statItem("잔여 공석", "${stats['remainingSeats']}", "석"),
+                _statItem(context, "잔여 공석", "${stats['remainingSeats']}", "석"),
               ],
             ),
             const SizedBox(height: 16),
@@ -235,13 +215,11 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
                 Text("입실률  ${(rate * 100).toStringAsFixed(0)}%",
                     style: TextStyle(
                         color: Colors.white.withOpacity(0.5),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
-                Text("$residents / $max명",
+                        fontSize: 11, fontWeight: FontWeight.w600)),
+                Text("$residents / $max${context.tr(AppStrings.members)}",
                     style: TextStyle(
                         color: Colors.white.withOpacity(0.5),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600)),
+                        fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
             const SizedBox(height: 6),
@@ -260,37 +238,32 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
     );
   }
 
-  Widget _statItem(String label, String value, String unit) {
+  Widget _statItem(BuildContext context, String label, String value, String unit) {
     return Column(children: [
       RichText(
         text: TextSpan(children: [
-          TextSpan(
-              text: value,
+          TextSpan(text: value,
               style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900)),
-          TextSpan(
-              text: " $unit",
-              style: TextStyle(
-                  color: Colors.white.withOpacity(0.6), fontSize: 12)),
+                  color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900)),
+          TextSpan(text: " $unit",
+              style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
         ]),
       ),
       const SizedBox(height: 5),
       Text(label,
           style: TextStyle(
               color: Colors.white.withOpacity(0.5),
-              fontSize: 12,
-              fontWeight: FontWeight.w600)),
+              fontSize: 12, fontWeight: FontWeight.w600)),
     ]);
   }
 
-  // ── 메뉴 그리드 ──
   Widget _buildMenuGrid(BuildContext context) {
     final menus = [
       _MenuItem(
         icon: Icons.vpn_key_rounded,
-        label: widget.isAdmin ? "승인 및 배정" : "입·퇴실 신청",
+        label: widget.isAdmin
+            ? context.tr(AppStrings.approvalAssign)
+            : context.tr(AppStrings.myDormitory),
         color: _primary,
         onTap: () {
           if (widget.isAdmin) {
@@ -299,38 +272,35 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
           } else {
             Navigator.push(context,
                 MaterialPageRoute(
-                    builder: (_) =>
-                        DormEmployeeScreen(userProfile: widget.userProfile)));
+                    builder: (_) => DormEmployeeScreen(userProfile: widget.userProfile)));
           }
         },
       ),
       _MenuItem(
         icon: Icons.menu_book_rounded,
-        label: "생활 규정",
+        label: context.tr(AppStrings.dormRules),
         color: const Color(0xFF8E59FF),
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const DormRulesScreen())),
       ),
       _MenuItem(
         icon: Icons.build_circle_rounded,
-        label: "비품/고장 신고",
+        label: context.tr(AppStrings.repairReport),
         color: const Color(0xFFFF9500),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => DormRepairScreen(
-                  userProfile: widget.userProfile, isAdmin: widget.isAdmin)),
-        ),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(
+                builder: (_) => DormRepairScreen(
+                    userProfile: widget.userProfile, isAdmin: widget.isAdmin))),
       ),
       _MenuItem(
         icon: Icons.analytics_rounded,
-        label: widget.isAdmin ? "전체 벌점 관리" : "나의 벌점 현황",
+        label: widget.isAdmin
+            ? context.tr(AppStrings.demeritMgmt)
+            : context.tr(AppStrings.myDemerit),
         color: const Color(0xFFFF3B30),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => DemeritListScreen(isAdmin: widget.isAdmin)),
-        ),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(
+                builder: (_) => DemeritListScreen(isAdmin: widget.isAdmin))),
       ),
     ];
 
@@ -356,12 +326,9 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6))
-            ],
+            boxShadow: [BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 16, offset: const Offset(0, 6))],
             border: Border.all(color: Colors.black.withOpacity(0.03)),
           ),
           child: Column(
@@ -378,15 +345,11 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
               const SizedBox(height: 13),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  item.label,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: _text,
-                      letterSpacing: -0.3),
-                ),
+                child: Text(item.label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800, fontSize: 13,
+                        color: _text, letterSpacing: -0.3)),
               ),
             ],
           ),
@@ -400,10 +363,8 @@ class _DormManagementScreenState extends State<DormManagementScreen> {
       padding: const EdgeInsets.only(left: 2),
       child: Text(title,
           style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: _text,
-              letterSpacing: -0.3)),
+              fontSize: 16, fontWeight: FontWeight.w900,
+              color: _text, letterSpacing: -0.3)),
     );
   }
 }
@@ -414,9 +375,7 @@ class _MenuItem {
   final Color color;
   final VoidCallback onTap;
   const _MenuItem({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
+    required this.icon, required this.label,
+    required this.color, required this.onTap,
   });
 }

@@ -26,7 +26,6 @@ class MealDetailTab extends StatefulWidget {
 }
 
 class _MealDetailTabState extends State<MealDetailTab> {
-  // 부서별 펼침 상태 (기본 모두 펼침)
   late Map<String, bool> _expanded;
 
   @override
@@ -38,7 +37,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
   @override
   void didUpdateWidget(MealDetailTab old) {
     super.didUpdateWidget(old);
-    // 새 부서 생기면 기본 펼침
     for (final d in widget.depts) {
       _expanded.putIfAbsent(d, () => true);
     }
@@ -47,7 +45,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // 필터 바
       Container(
         color: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -62,7 +59,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
               label: (m) => '$m월',
               onChanged: (v) => widget.onMonthChanged(widget.selectedYear, v!)),
           const Spacer(),
-          // 전체 펼침/접기 토글
           TextButton.icon(
             onPressed: () {
               final allExpanded = _expanded.values.every((v) => v);
@@ -106,7 +102,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
         .toList();
     final isOpen = _expanded[dept] ?? true;
 
-    // 부서 전체 집계 (미리 계산)
     int deptTotalEat = 0, deptTotalNo = 0;
     for (final p in profiles) {
       final userId = p['id'] as String;
@@ -125,9 +120,10 @@ class _MealDetailTabState extends State<MealDetailTab> {
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(children: [
-        // ── 부서 헤더 (탭하면 접기/펼치기)
+        // ── 부서 헤더: 롱프레스 → 부서 식사 현황 / 탭 → 접기펼치기
         InkWell(
           onTap: () => setState(() => _expanded[dept] = !isOpen),
+          onLongPress: () => _showDeptMealSheet(context, dept, profiles),
           borderRadius: BorderRadius.vertical(
               top: const Radius.circular(18),
               bottom: isOpen ? Radius.zero : const Radius.circular(18)),
@@ -139,15 +135,25 @@ class _MealDetailTabState extends State<MealDetailTab> {
                     top: const Radius.circular(18),
                     bottom: isOpen ? Radius.zero : const Radius.circular(18))),
             child: Row(children: [
-              Container(padding: const EdgeInsets.all(7),
+              // 부서 아이콘 — 탭하면 식사 현황 시트 오픈
+              GestureDetector(
+                onTap: () => _showDeptMealSheet(context, dept, profiles),
+                child: Container(
+                  padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(color: dc.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
-                  child: Icon(Icons.group_rounded, color: dc, size: 16)),
+                  child: Icon(Icons.group_rounded, color: dc, size: 16),
+                ),
+              ),
               const SizedBox(width: 10),
-              Text(mrDeptLabel(dept), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: dc)),
+              // 부서명 탭 → 식사 현황 시트
+              GestureDetector(
+                onTap: () => _showDeptMealSheet(context, dept, profiles),
+                child: Text(mrDeptLabel(dept),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: dc)),
+              ),
               const SizedBox(width: 8),
               Text("${profiles.length}명", style: TextStyle(fontSize: 12, color: dc.withOpacity(0.6))),
               const Spacer(),
-              // 부서 참여율
               Text("${(deptRate * 100).toStringAsFixed(1)}%",
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: deptRc)),
               const SizedBox(width: 8),
@@ -160,7 +166,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
           ),
         ),
 
-        // ── 개인별 목록 (접히면 사라짐)
         AnimatedCrossFade(
           firstChild: Column(children: [
             Divider(height: 1, color: Colors.black.withOpacity(0.05)),
@@ -176,6 +181,32 @@ class _MealDetailTabState extends State<MealDetailTab> {
           duration: const Duration(milliseconds: 220),
         ),
       ]),
+    );
+  }
+
+  // ── 부서 식사 현황 바텀시트
+  void _showDeptMealSheet(
+      BuildContext context, String dept, List<Map<String, dynamic>> profiles) {
+    final dc = mrDeptColor(dept);
+
+    // 오늘 기준 가장 최근 날짜 찾기
+    final today = DateTime.now();
+    final recentDays = widget.dayStats.reversed.toList();
+
+    // 탭 인덱스: 0=점심, 1=저녁
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DeptMealSheet(
+        dept: dept,
+        dc: dc,
+        profiles: profiles,
+        allMonthlyRaw: widget.allMonthlyRaw,
+        dayStats: recentDays,
+        year: widget.selectedYear,
+        month: widget.selectedMonth,
+      ),
     );
   }
 
@@ -232,14 +263,12 @@ class _MealDetailTabState extends State<MealDetailTab> {
     ]);
   }
 
-  // ── 개인 식사 기록 바텀시트
   void _showPersonDetail(BuildContext context, Map<String, dynamic> profile,
       List<Map<String, dynamic>> myRows) {
     final name = profile['full_name'] as String? ?? '-';
     final dept = profile['dept_category'] as String? ?? '';
     final dc   = mrDeptColor(dept);
 
-    // 날짜별로 그룹
     final byDate = <String, Map<String, dynamic>>{};
     for (final day in widget.dayStats) {
       final lunchRow  = myRows.firstWhere(
@@ -265,11 +294,9 @@ class _MealDetailTabState extends State<MealDetailTab> {
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
           child: Column(children: [
-            // 핸들
             Padding(padding: const EdgeInsets.only(top: 14),
                 child: Center(child: Container(width: 40, height: 4,
                     decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))))),
-            // 헤더
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               child: Row(children: [
@@ -292,8 +319,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
               ]),
             ),
             Divider(height: 1, color: Colors.black.withOpacity(0.06)),
-
-            // 날짜별 리스트
             Expanded(
               child: ListView(
                 controller: scrollController,
@@ -319,7 +344,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
                           blurRadius: 6, offset: const Offset(0, 2))] : [],
                     ),
                     child: Row(children: [
-                      // 날짜
                       Container(width: 42,
                           padding: const EdgeInsets.symmetric(vertical: 5),
                           decoration: BoxDecoration(
@@ -332,7 +356,6 @@ class _MealDetailTabState extends State<MealDetailTab> {
                                 color: hasAny ? mrPrimary.withOpacity(0.6) : mrSub.withOpacity(0.3))),
                           ])),
                       const SizedBox(width: 12),
-                      // 점심/저녁
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           _dayMealRow("🌞 점심", lunch, mrOrange),
@@ -390,6 +413,289 @@ class _MealDetailTabState extends State<MealDetailTab> {
         mrTiny("${eat}식", mrOrange),
         const SizedBox(width: 3),
         mrTiny("${no}불", mrSub),
+      ]),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// 부서 식사 현황 바텀시트
+// ══════════════════════════════════════════════════════════
+class _DeptMealSheet extends StatefulWidget {
+  final String dept;
+  final Color dc;
+  final List<Map<String, dynamic>> profiles;
+  final List<Map<String, dynamic>> allMonthlyRaw;
+  final List<DayStat> dayStats; // reversed (최신순)
+  final int year, month;
+
+  const _DeptMealSheet({
+    required this.dept,
+    required this.dc,
+    required this.profiles,
+    required this.allMonthlyRaw,
+    required this.dayStats,
+    required this.year,
+    required this.month,
+  });
+
+  @override
+  State<_DeptMealSheet> createState() => _DeptMealSheetState();
+}
+
+class _DeptMealSheetState extends State<_DeptMealSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  // 선택된 날짜 (기본: 가장 최신 날짜)
+  late String _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _selectedDate = widget.dayStats.isNotEmpty ? widget.dayStats.first.date : '';
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> _getList(String mealType) {
+    final eating   = <Map<String, dynamic>>[];
+    final notEating = <Map<String, dynamic>>[];
+    final noReply  = <Map<String, dynamic>>[];
+
+    for (final p in widget.profiles) {
+      final userId = p['id'] as String;
+      final row = widget.allMonthlyRaw.firstWhere(
+        (r) => r['user_id'] == userId &&
+               r['meal_date'] == _selectedDate &&
+               r['meal_type'] == mealType,
+        orElse: () => {},
+      );
+      if (row.isEmpty) {
+        noReply.add(p);
+      } else if (row['is_eating'] == true) {
+        eating.add(p);
+      } else {
+        notEating.add(p);
+      }
+    }
+    return [...eating, ...notEating, ...noReply];
+  }
+
+  String _mealStatus(String userId, String mealType) {
+    final row = widget.allMonthlyRaw.firstWhere(
+      (r) => r['user_id'] == userId &&
+             r['meal_date'] == _selectedDate &&
+             r['meal_type'] == mealType,
+      orElse: () => {},
+    );
+    if (row.isEmpty) return 'none';
+    return row['is_eating'] == true ? 'eat' : 'no';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dc = widget.dc;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.7,
+      minChildSize: 0.45,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(children: [
+          // 핸들
+          Padding(
+            padding: const EdgeInsets.only(top: 14),
+            child: Center(child: Container(width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+          ),
+          // 헤더
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(color: dc.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+                child: Icon(Icons.restaurant_menu_rounded, color: dc, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(mrDeptLabel(widget.dept),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: dc)),
+                Text("${widget.year}년 ${widget.month}월 · ${widget.profiles.length}명",
+                    style: const TextStyle(fontSize: 12, color: mrSub)),
+              ]),
+            ]),
+          ),
+
+          // 날짜 선택 칩
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: widget.dayStats.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (_, i) {
+                final day = widget.dayStats[i];
+                final parts = day.date.split('-');
+                final dd = parts[2];
+                final dt = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+                final wd = mrWeekdayStr(dt.weekday);
+                final isSelected = _selectedDate == day.date;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedDate = day.date),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected ? dc : dc.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text("$dd($wd)",
+                        style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w800,
+                          color: isSelected ? Colors.white : dc,
+                        )),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 점심 / 저녁 탭
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: dc.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: dc,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: dc,
+              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              tabs: const [
+                Tab(text: "🌞  점심"),
+                Tab(text: "🌙  저녁"),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Divider(height: 1, color: Colors.black.withOpacity(0.05)),
+
+          // 리스트
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildMealList('LUNCH', scrollController),
+                _buildMealList('DINNER', scrollController),
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildMealList(String mealType, ScrollController scrollController) {
+    final list = _getList(mealType);
+
+    // 그룹별 카운트
+    int eatCount  = list.where((p) => _mealStatus(p['id'], mealType) == 'eat').length;
+    int noCount   = list.where((p) => _mealStatus(p['id'], mealType) == 'no').length;
+    int noneCount = list.where((p) => _mealStatus(p['id'], mealType) == 'none').length;
+
+    return ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+      children: [
+        // 요약 뱃지
+        Row(children: [
+          _summaryBadge("식사", eatCount, mrOrange),
+          const SizedBox(width: 8),
+          _summaryBadge("불참", noCount, mrSub),
+          const SizedBox(width: 8),
+          _summaryBadge("미응답", noneCount, mrRed),
+        ]),
+        const SizedBox(height: 12),
+
+        ...list.map((p) {
+          final name   = p['full_name'] as String? ?? '-';
+          final status = _mealStatus(p['id'] as String, mealType);
+          final (icon, label, color, bg) = switch (status) {
+            'eat'  => (Icons.restaurant_rounded,          "식사",  mrOrange, mrOrange.withOpacity(0.08)),
+            'no'   => (Icons.do_not_disturb_alt_rounded,  "불참",  mrSub,    mrSub.withOpacity(0.07)),
+            _      => (Icons.help_outline_rounded,         "미응답", mrRed,    mrRed.withOpacity(0.06)),
+          };
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Row(children: [
+              CircleAvatar(
+                radius: 15,
+                backgroundColor: widget.dc.withOpacity(0.1),
+                child: Text(name.isNotEmpty ? name[0] : '?',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: widget.dc)),
+              ),
+              const SizedBox(width: 10),
+              Text(name,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: mrText)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, size: 13, color: color),
+                  const SizedBox(width: 4),
+                  Text(label,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+                ]),
+              ),
+            ]),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _summaryBadge(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+        const SizedBox(width: 6),
+        Text("$count명",
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: color)),
       ]),
     );
   }

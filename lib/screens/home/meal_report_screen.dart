@@ -62,7 +62,7 @@ class _MealReportScreenState extends State<MealReportScreen>
       final lastDayStr = '$monthStr-${lastDay.toString().padLeft(2, '0')}';
 
       final results = await Future.wait([
-        supabase.from('profiles').select('id, full_name, dept_category'),
+        supabase.from('profiles').select('id, full_name, dept_category, nationality'),
         supabase.from('meal_requests')
             .select('user_id, full_name, dept_category, meal_date, is_eating, meal_type')
             .gte('meal_date', '$monthStr-01')

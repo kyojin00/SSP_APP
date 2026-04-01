@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'attendance_helper.dart';
 
-class LeaveStatusTab extends StatelessWidget {
+class LeaveStatusTab extends StatefulWidget {
   final List<Map<String, dynamic>> leaveRequests;
   final List<Map<String, dynamic>> onLeaveNow;
   final Map<String, List<Map<String, dynamic>>> profilesByDept;
   final Future<void> Function() onRefresh;
   final Future<void> Function(String id, String status) onUpdateStatus;
-  final bool canApprove; // 과장급 이상만 true
+  final bool canApprove;
 
   const LeaveStatusTab({
     Key? key,
@@ -19,7 +19,14 @@ class LeaveStatusTab extends StatelessWidget {
     this.canApprove = false,
   }) : super(key: key);
 
-  // ✅ 부서 라벨 매핑 (영문 코드 → 한글 표시)
+  @override
+  State<LeaveStatusTab> createState() => _LeaveStatusTabState();
+}
+
+class _LeaveStatusTabState extends State<LeaveStatusTab> {
+  // 접힌 부서 Set (기본: 모두 펼침)
+  final Set<String> _collapsedDepts = {};
+
   static const Map<String, String> _deptLabels = {
     'MANAGEMENT': '관리부',
     'PRODUCTION': '생산관리부',
@@ -28,6 +35,9 @@ class LeaveStatusTab extends StatelessWidget {
     'STEEL':      '스틸생산부',
     'BOX':        '박스생산부',
     'DELIVERY':   '포장납품부',
+    'SSG':        '에스에스지',
+    'CLEANING':   '환경미화',
+    'NUTRITION':  '영양사',
   };
 
   String _deptLabel(String dept) => _deptLabels[dept] ?? dept;
@@ -36,38 +46,129 @@ class LeaveStatusTab extends StatelessWidget {
       v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
 
   bool _isOnLeave(String userId) =>
-      onLeaveNow.any((l) => l['user_id'] == userId);
+      widget.onLeaveNow.any((l) => l['user_id'] == userId);
+
+  String _step2PositionByDept(String dept) {
+    switch (dept) {
+      case 'MANAGEMENT': return '대표이사';
+      case 'PRODUCTION': return '이사';
+      default:           return '대표이사';
+    }
+  }
+
+  String _s1Name(Map<String, dynamic> item) {
+    final saved = item['step1_approver_name'] as String?;
+    if (saved != null && saved.isNotEmpty) return saved;
+    final dept = item['dept_category'] as String? ?? '';
+    return switch (dept) {
+      'MANAGEMENT' => '과장',
+      'PRODUCTION' => '차장',
+      _            => '과장',
+    };
+  }
+
+  String _s2Name(Map<String, dynamic> item) {
+    final saved = item['step2_approver_name'] as String?;
+    if (saved != null && saved.isNotEmpty) return saved;
+    final dept = item['dept_category'] as String? ?? '';
+    return _step2PositionByDept(dept);
+  }
+
+  void _toggleDept(String dept) {
+    setState(() {
+      if (_collapsedDepts.contains(dept)) {
+        _collapsedDepts.remove(dept);
+      } else {
+        _collapsedDepts.add(dept);
+      }
+    });
+  }
+
+  void _collapseAll() {
+    setState(() {
+      _collapsedDepts.addAll(widget.profilesByDept.keys);
+    });
+  }
+
+  void _expandAll() {
+    setState(() => _collapsedDepts.clear());
+  }
 
   @override
   Widget build(BuildContext context) {
+    final allCollapsed = _collapsedDepts.length == widget.profilesByDept.length;
+
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: widget.onRefresh,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // 승인 대기
-          if (leaveRequests.isNotEmpty) ...[
-            attendanceSectionHeader("승인 대기 (${leaveRequests.length})",
-                Icons.pending_actions_rounded, Colors.orange),
+          if (widget.leaveRequests.isNotEmpty) ...[
+            attendanceSectionHeader(
+                "승인 대기 (${widget.leaveRequests.length})",
+                Icons.pending_actions_rounded,
+                Colors.orange),
             const SizedBox(height: 12),
-            ...leaveRequests.map((req) => _requestCard(context, req, canApprove)),
+            ...widget.leaveRequests.map(
+                (req) => _requestCard(context, req, widget.canApprove)),
             const SizedBox(height: 28),
           ],
 
           // 현재 휴가 중
-          if (onLeaveNow.isNotEmpty) ...[
-            attendanceSectionHeader("현재 휴가 중 (${onLeaveNow.length})",
-                Icons.flight_takeoff_rounded, Colors.indigo),
+          if (widget.onLeaveNow.isNotEmpty) ...[
+            attendanceSectionHeader(
+                "현재 휴가 중 (${widget.onLeaveNow.length})",
+                Icons.flight_takeoff_rounded,
+                Colors.indigo),
             const SizedBox(height: 12),
-            ...onLeaveNow.map(_onLeaveCard),
+            ...widget.onLeaveNow.map(_onLeaveCard),
             const SizedBox(height: 28),
           ],
 
-          // 부서별 연차 현황
-          attendanceSectionHeader("부서별 연차 현황",
-              Icons.people_rounded, const Color(0xFF2E6BFF)),
+          // 부서별 연차 현황 헤더 + 전체 펼치기/접기
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: attendanceSectionHeader(
+                    "부서별 연차 현황",
+                    Icons.people_rounded,
+                    const Color(0xFF2E6BFF)),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: allCollapsed ? _expandAll : _collapseAll,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2E6BFF).withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(
+                      allCollapsed
+                          ? Icons.unfold_more_rounded
+                          : Icons.unfold_less_rounded,
+                      size: 14,
+                      color: const Color(0xFF2E6BFF),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      allCollapsed ? '전체 펼치기' : '전체 접기',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF2E6BFF)),
+                    ),
+                  ]),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
-          ...profilesByDept.entries
+          ...widget.profilesByDept.entries
               .map((e) => _deptSection(e.key, e.value)),
         ],
       ),
@@ -75,7 +176,8 @@ class LeaveStatusTab extends StatelessWidget {
   }
 
   // ── 승인 대기 카드 ──
-  Widget _requestCard(BuildContext context, Map<String, dynamic> item, bool canApprove) {
+  Widget _requestCard(
+      BuildContext context, Map<String, dynamic> item, bool canApprove) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
@@ -92,16 +194,20 @@ class LeaveStatusTab extends StatelessWidget {
             children: [
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(item['full_name'] ?? '-',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold)),
                 Text(_stepLabel(item),
-                    style: TextStyle(fontSize: 12, color: _stepColor(item), fontWeight: FontWeight.w700)),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: _stepColor(item),
+                        fontWeight: FontWeight.w700)),
               ]),
               Text("${item['leave_days']}일 신청",
-                  style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                  style: const TextStyle(
+                      color: Colors.orange, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 8),
-          // 결재 단계 표시
           _stepIndicator(item),
           const SizedBox(height: 8),
           Text("기간: ${item['start_date']} ~ ${item['end_date']}",
@@ -110,14 +216,16 @@ class LeaveStatusTab extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text("사유: ${item['reason']}",
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  style:
+                      const TextStyle(fontSize: 12, color: Colors.grey)),
             ),
           const SizedBox(height: 14),
           if (canApprove)
             Row(children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => onUpdateStatus(item['id'], 'REJECTED'),
+                  onPressed: () =>
+                      widget.onUpdateStatus(item['id'], 'REJECTED'),
                   style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red)),
@@ -127,8 +235,10 @@ class LeaveStatusTab extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => onUpdateStatus(item['id'], 'APPROVED'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  onPressed: () =>
+                      widget.onUpdateStatus(item['id'], 'APPROVED'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green),
                   child: const Text("승인",
                       style: TextStyle(color: Colors.white)),
                 ),
@@ -187,11 +297,16 @@ class LeaveStatusTab extends StatelessWidget {
     );
   }
 
-  // ── 부서별 섹션 ──
+  // ── 부서별 섹션 (접기/펼치기) ──
   Widget _deptSection(String dept, List<Map<String, dynamic>> profiles) {
-    final color = deptColor(dept);
+    final color      = deptColor(dept);
+    final isCollapsed = _collapsedDepts.contains(dept);
+    final onLeaveCount = profiles
+        .where((p) => _isOnLeave(p['id'] ?? ''))
+        .length;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -203,34 +318,67 @@ class LeaveStatusTab extends StatelessWidget {
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // 부서 헤더
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(18)),
-          ),
-          child: Row(children: [
-            Container(
-                width: 8, height: 8,
-                decoration:
-                    BoxDecoration(color: color, shape: BoxShape.circle)),
-            const SizedBox(width: 8),
-            Text(
-              _deptLabel(dept), // ✅ 한글 라벨 표시
-              style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 14,
-                  color: color),
+        // 부서 헤더 (탭으로 접기/펼치기)
+        GestureDetector(
+          onTap: () => _toggleDept(dept),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              borderRadius: isCollapsed
+                  ? BorderRadius.circular(18)
+                  : const BorderRadius.vertical(top: Radius.circular(18)),
             ),
-            const Spacer(),
-            Text("${profiles.length}명",
-                style:
-                    TextStyle(fontSize: 12, color: color.withOpacity(0.7))),
-          ]),
+            child: Row(children: [
+              Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text(
+                _deptLabel(dept),
+                style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                    color: color),
+              ),
+              const SizedBox(width: 8),
+              // 휴가 중 인원 뱃지
+              if (onLeaveCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: Colors.indigo,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text('휴가 $onLeaveCount명',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800)),
+                ),
+              const Spacer(),
+              Text("${profiles.length}명",
+                  style: TextStyle(
+                      fontSize: 12, color: color.withOpacity(0.7))),
+              const SizedBox(width: 8),
+              // 접기/펼치기 아이콘
+              AnimatedRotation(
+                turns: isCollapsed ? 0 : 0.5,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(Icons.keyboard_arrow_down_rounded,
+                    color: color.withOpacity(0.7), size: 20),
+              ),
+            ]),
+          ),
         ),
-        ...profiles.map((p) => _profileRow(p)),
+        // 접혔을 때 내용 숨김
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: isCollapsed
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          firstChild: Column(children: profiles.map(_profileRow).toList()),
+          secondChild: const SizedBox.shrink(),
+        ),
       ]),
     );
   }
@@ -246,7 +394,8 @@ class LeaveStatusTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: onLeave ? Colors.indigo.withOpacity(0.04) : null,
-        border: Border(top: BorderSide(color: Colors.grey.withOpacity(0.08))),
+        border:
+            Border(top: BorderSide(color: Colors.grey.withOpacity(0.08))),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -256,8 +405,7 @@ class LeaveStatusTab extends StatelessWidget {
           const SizedBox(width: 8),
           if (onLeave)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                   color: Colors.indigo,
                   borderRadius: BorderRadius.circular(6)),
@@ -306,10 +454,8 @@ class LeaveStatusTab extends StatelessWidget {
   String _stepLabel(Map<String, dynamic> item) {
     final step1 = item['step1_status'] as String? ?? 'PENDING';
     final step2 = item['step2_status'] as String? ?? 'WAITING';
-    final s1Name = item['step1_approver_name'] as String? ?? '과장';
-    final s2Name = item['step2_approver_name'] as String? ?? '본부장';
-    if (step1 == 'PENDING') return '1차 결재 대기 ($s1Name)';
-    if (step1 == 'APPROVED' && step2 == 'PENDING') return '2차 결재 대기 ($s2Name)';
+    if (step1 == 'PENDING') return '1차 결재 대기 (${_s1Name(item)})';
+    if (step1 == 'APPROVED' && step2 == 'PENDING') return '2차 결재 대기 (${_s2Name(item)})';
     return '결재 진행 중';
   }
 
@@ -322,29 +468,35 @@ class LeaveStatusTab extends StatelessWidget {
   Widget _stepIndicator(Map<String, dynamic> item) {
     final step1 = item['step1_status'] as String? ?? 'PENDING';
     final step2 = item['step2_status'] as String? ?? 'WAITING';
-    final s1Name = item['step1_approver_name'] as String? ?? '과장';
-    final s2Name = item['step2_approver_name'] as String? ?? '본부장';
 
-    Widget _dot(String label, String status) {
+    Widget dot(String label, String status) {
       final Color c = status == 'APPROVED' ? Colors.green
-          : status == 'PENDING' ? Colors.orange
+          : status == 'PENDING'  ? Colors.orange
           : status == 'REJECTED' ? Colors.redAccent
           : Colors.grey.shade300;
-      final IconData icon = status == 'APPROVED' ? Icons.check_circle_rounded
-          : status == 'REJECTED' ? Icons.cancel_rounded
-          : status == 'PENDING' ? Icons.radio_button_checked_rounded
-          : Icons.radio_button_unchecked_rounded;
+      final IconData icon = status == 'APPROVED'
+          ? Icons.check_circle_rounded
+          : status == 'REJECTED'
+              ? Icons.cancel_rounded
+              : status == 'PENDING'
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded;
       return Column(children: [
         Icon(icon, color: c, size: 20),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w700)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 10, color: c, fontWeight: FontWeight.w700)),
       ]);
     }
 
     return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      _dot(s1Name, step1),
-      Expanded(child: Divider(color: step1 == 'APPROVED' ? Colors.green : Colors.grey.shade300, thickness: 2)),
-      _dot(s2Name, step2),
+      dot(_s1Name(item), step1),
+      Expanded(
+          child: Divider(
+              color: step1 == 'APPROVED' ? Colors.green : Colors.grey.shade300,
+              thickness: 2)),
+      dot(_s2Name(item), step2),
     ]);
   }
 }

@@ -27,6 +27,28 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   static const _text    = Color(0xFF1A1D2E);
   static const _sub     = Color(0xFF8A93B0);
 
+  // ──────────────────────────────────────────
+  // 부서 → 결재자 직책 매핑
+  // ──────────────────────────────────────────
+
+  /// 부서에 따른 step1 결재자 직책
+  String _step1Position(String dept) {
+    switch (dept) {
+      case 'MANAGEMENT': return '과장';    // 관리부: 과장
+      case 'PRODUCTION': return '차장';    // 생산관리부: 차장
+      default:           return '과장';    // 기본값
+    }
+  }
+
+  /// 부서에 따른 step2 최종 결재자 직책
+  String _step2Position(String dept) {
+    switch (dept) {
+      case 'MANAGEMENT': return '대표이사';  // 관리부: 대표이사
+      case 'PRODUCTION': return '이사';      // 생산관리부: 이사
+      default:           return '대표이사';  // 기본값
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,25 +98,70 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
     try {
+      // 1) 내 프로필 조회
       final myProfile = await supabase
-          .from('profiles').select('full_name, dept_category').eq('id', user.id).single();
+          .from('profiles')
+          .select('full_name, dept_category')
+          .eq('id', user.id)
+          .single();
       final fullName = (myProfile['full_name'] as String?) ?? '';
       final dept     = (myProfile['dept_category'] as String?) ?? '';
 
+      // 2) 부서에 맞는 결재자 직책 결정
+      final step1Position = _step1Position(dept);
+      final step2Position = _step2Position(dept);
+
+      // 3) step1, step2 결재자 동시 조회
+      final approverResults = await Future.wait([
+        supabase.from('profiles').select('id, full_name').eq('position', step1Position).limit(1),
+        supabase.from('profiles').select('id, full_name').eq('position', step2Position).limit(1),
+      ]);
+
+      final step1List = approverResults[0] as List;
+      final step2List = approverResults[1] as List;
+
+      String? step1ApproverId;
+      String  step1ApproverName = step1Position;
+      String? step2ApproverId;
+      String  step2ApproverName = step2Position;
+
+      if (step1List.isNotEmpty) {
+        final a = step1List.first as Map<String, dynamic>;
+        step1ApproverId   = a['id'] as String?;
+        step1ApproverName = (a['full_name'] as String?) ?? step1Position;
+      }
+      if (step2List.isNotEmpty) {
+        final a = step2List.first as Map<String, dynamic>;
+        step2ApproverId   = a['id'] as String?;
+        step2ApproverName = (a['full_name'] as String?) ?? step2Position;
+      }
+
+      // 4) 휴가 신청 insert
       await supabase.from('leave_requests').insert({
-        'user_id': user.id, 'full_name': fullName, 'dept_category': dept,
-        'start_date': DateFormat('yyyy-MM-dd').format(start),
-        'end_date': DateFormat('yyyy-MM-dd').format(end),
-        'leave_days': days, 'reason': reason, 'leave_type': type,
-        'status': 'PENDING', 'step1_status': 'PENDING', 'step2_status': 'WAITING',
+        'user_id':             user.id,
+        'full_name':           fullName,
+        'dept_category':       dept,
+        'start_date':          DateFormat('yyyy-MM-dd').format(start),
+        'end_date':            DateFormat('yyyy-MM-dd').format(end),
+        'leave_days':          days,
+        'reason':              reason,
+        'leave_type':          type,
+        'status':              'PENDING',
+        'step1_status':        'PENDING',
+        'step1_approver_id':   step1ApproverId,
+        'step1_approver_name': step1ApproverName,
+        'step2_status':        'WAITING',
+        'step2_approver_id':   step2ApproverId,
+        'step2_approver_name': step2ApproverName,
       });
+
       await _fetchLeaveData();
       _showSnackBar(context.tr({
-        'ko': '신청 완료! 승인을 기다려주세요. ✅',
-        'en': 'Submitted! Waiting for approval. ✅',
-        'vi': 'Da gui! Cho phe duyet. ✅',
-        'uz': 'Yuborildi! Tasdiqlash kutilmoqda. ✅',
-        'km': 'បានដាក់ស្នើ! កំពុងរង់ចាំការអនុម័ត។ ✅',
+        'ko': '신청 완료! $step1ApproverName 승인을 기다려주세요. ✅',
+        'en': 'Submitted! Waiting for $step1ApproverName\'s approval. ✅',
+        'vi': 'Da gui! Cho $step1ApproverName phe duyet. ✅',
+        'uz': 'Yuborildi! $step1ApproverName tasdiqlashi kutilmoqda. ✅',
+        'km': 'បានដាក់ស្នើ! កំពុងរង់ចាំការអនុម័តពី $step1ApproverName។ ✅',
       }));
     } catch (e) {
       debugPrint("휴가 신청 실패: $e");
@@ -230,16 +297,28 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   }
 
   Widget _leaveCard(Map<String, dynamic> item) {
-    final status    = item['status']     as String? ?? '';
-    final leaveType = item['leave_type'] as String? ?? 'ANNUAL';
-    final days      = (item['leave_days'] as num?)?.toDouble() ?? 0;
-    final start     = item['start_date'] as String? ?? '';
-    final end       = item['end_date']   as String? ?? '';
-    final reason    = item['reason']     as String? ?? '';
-    final step1 = item['step1_status'] as String? ?? 'PENDING';
-    final step2 = item['step2_status'] as String? ?? 'WAITING';
-    final step1Name = item['step1_approver_name'] as String? ?? context.tr({'ko':'과장','en':'Manager','vi':'Truong phong','uz':'Menejer','km':'អ្នកគ្រប់គ្រង'});
-    final step2Name = item['step2_approver_name'] as String? ?? context.tr({'ko':'본부장','en':'Director','vi':'Giam doc','uz':'Direktor','km':'នាយក'});
+    final status    = item['status']        as String? ?? '';
+    final leaveType = item['leave_type']    as String? ?? 'ANNUAL';
+    // 본인 휴가 목록이므로 프로필 부서를 기준으로 fallback
+    final dept      = (item['dept_category'] as String?)?.isNotEmpty == true
+        ? item['dept_category'] as String
+        : (widget.userProfile['dept_category'] as String? ?? '');
+    final days      = (item['leave_days']   as num?)?.toDouble() ?? 0;
+    final start     = item['start_date']    as String? ?? '';
+    final end       = item['end_date']      as String? ?? '';
+    final reason    = item['reason']        as String? ?? '';
+    final step1     = item['step1_status']  as String? ?? 'PENDING';
+    final step2     = item['step2_status']  as String? ?? 'WAITING';
+
+    // step2_approver_name이 null이면 부서 기반 직책으로 표시
+    final step1Name = (item['step1_approver_name'] as String?)?.isNotEmpty == true
+        ? item['step1_approver_name'] as String
+        : _step1Position(dept);
+    final step2Name = (item['step2_approver_name'] as String?)?.isNotEmpty == true
+        ? item['step2_approver_name'] as String
+        : _step2Position(dept);
+
+    debugPrint('leaveCard dept=$dept step2Name=$step2Name');
 
     final Color statusColor;
     final String statusLabel;
@@ -280,7 +359,8 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       return '${d.substring(5, 7)}/${d.substring(8, 10)}';
     }
     final dateStr = start == end
-        ? fmtDate(start) : '${fmtDate(start)} ~ ${fmtDate(end)}';
+        ? fmtDate(start)
+        : '${fmtDate(start)} ~ ${fmtDate(end)}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
