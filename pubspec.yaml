@@ -32,6 +32,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   # 1. 앱 아이콘 생성을 위한 패키지 추가
   flutter_launcher_icons: ^0.14.4
+  shared_preferences: ^2.2.3
 
 # 2. 앱 아이콘 상세 설정 추가 (여기에 파일 경로를 적습니다)
 flutter_launcher_icons:

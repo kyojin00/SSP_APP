@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 
+import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login_screen.dart';
 import 'meal_check_screen.dart';
 import 'notice_list_screen.dart';
@@ -80,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _attendanceChecked = false;
   bool _bannerLoading  = true;
   int _pendingFuelCount    = 0;
+  List<String> _quickActionIds = ['meal_check', 'attendance'];
   int _pendingLeaveCount   = 0;
   int _pendingUniformCount = 0;
 
@@ -118,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen>
     _booted = true;
     _loadUserProfile();
     _reconnectOneSignal(showSnack: false);
+    _loadQuickActionPrefs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final isAdmin = _userProfile?['role'] == 'ADMIN';
@@ -255,6 +258,31 @@ class _HomeScreenState extends State<HomeScreen>
       debugPrint('[OneSignal] reconnect error: $e');
       if (showSnack && mounted)
         _snack(context.tr(AppStrings.notifReconnectFail));
+    }
+  }
+
+  // ── 퀵액션 환경설정 ──
+  Future<void> _loadQuickActionPrefs() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getStringList('quick_actions_\${user.id}');
+      if (saved != null && mounted) setState(() => _quickActionIds = saved);
+    } catch (e) {
+      debugPrint('퀵액션 로드 실패: \$e');
+    }
+  }
+
+  Future<void> saveQuickActionPrefs(List<String> ids) async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('quick_actions_\${user.id}', ids);
+      if (mounted) setState(() => _quickActionIds = ids);
+    } catch (e) {
+      debugPrint('퀵액션 저장 실패: \$e');
     }
   }
 
@@ -452,7 +480,7 @@ class _HomeScreenState extends State<HomeScreen>
                         userProfile: _userProfile!)),
                   ),
                 if (!_bannerLoading) const SizedBox(height: 20),
-                _quickActions(isAdmin),
+                _quickActions(isAdmin, isNutrition, _userProfile!['dept_category'] as String? ?? ''),
                 const SizedBox(height: 24),
                 _SectionHeader(
                   title: context.tr(AppStrings.menu),

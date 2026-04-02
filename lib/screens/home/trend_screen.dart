@@ -19,12 +19,10 @@ class _DailyMeal {
 class _DeptMeal {
   final String dept;
   final int total;
-  final int headcount; // 부서 인원수
+  final int headcount;
   const _DeptMeal({required this.dept, required this.total, required this.headcount});
 
-  // 1인당 평균 식수 횟수 (참여율 기반)
   double get rate => headcount > 0 ? (total / headcount).clamp(0.0, 100.0) : 0.0;
-  // 퍼센트 표시용 (최대 참여 가능 식수 = 인원 × 기간 × 2끼 기준)
   double rateOf(int days) => headcount > 0 && days > 0
       ? ((total / (headcount * days * 2)) * 100).clamp(0.0, 100.0)
       : 0.0;
@@ -54,14 +52,17 @@ class _TrendScreenState extends State<TrendScreen>
     with SingleTickerProviderStateMixin {
   final supabase = Supabase.instance.client;
 
+  // ── 영양사 제외
+  static const _excludedDepts = {'NUTRITION'};
+
   _Period _period = _Period.week;
   bool _loading = true;
-  bool _deptShowPercent = true; // true: 참여율%, false: 절대 건수
+  bool _deptShowPercent = true;
 
   List<_DailyMeal> _mealTrend = [];
   List<_DeptMeal> _deptMeal = [];
   List<_DailyAttendance> _attendTrend = [];
-  int _deptPeriodDays = 7; // 조회 기간 영업일수
+  int _deptPeriodDays = 7;
 
   int _totalLunch = 0;
   int _totalDinner = 0;
@@ -85,10 +86,6 @@ class _TrendScreenState extends State<TrendScreen>
     super.dispose();
   }
 
-  // ──────────────────────────────────────────
-  // 날짜 범위
-  // ──────────────────────────────────────────
-
   DateTimeRange get _range {
     final now = DateTime.now();
     if (_period == _Period.today) {
@@ -109,10 +106,6 @@ class _TrendScreenState extends State<TrendScreen>
       );
     }
   }
-
-  // ──────────────────────────────────────────
-  // 데이터 로딩
-  // ──────────────────────────────────────────
 
   Future<void> _loadData() async {
     setState(() => _loading = true);
@@ -140,23 +133,38 @@ class _TrendScreenState extends State<TrendScreen>
       final attendRaw  = results[1] as List;
       final profileRaw = results[2] as List;
 
+      // ── 영양사 제외한 user_id → dept 맵
       final userDept = <String, String>{};
       for (final p in profileRaw) {
-        userDept[p['id'] as String] = p['dept_category'] as String? ?? '기타';
+        final dept = p['dept_category'] as String? ?? '기타';
+        if (!_excludedDepts.contains(dept)) {
+          userDept[p['id'] as String] = dept;
+        }
       }
-      final empCount = profileRaw.where((p) =>
-          (p['dept_category'] as String?)?.isNotEmpty == true).length;
+
+      // ── 영양사 제외한 전체 직원 수
+      final empCount = profileRaw.where((p) {
+        final dept = p['dept_category'] as String?;
+        return dept != null &&
+            dept.isNotEmpty &&
+            !_excludedDepts.contains(dept);
+      }).length;
+
+      // ── 영양사 제외한 meal_requests (userDept에 없으면 NUTRITION)
+      final filteredMealRaw = mealRaw.where((r) {
+        final uid = r['user_id'] as String? ?? '';
+        return userDept.containsKey(uid);
+      }).toList();
 
       // ── 식수 일별 집계
       final mealByDate = <String, Map<String, int>>{};
-      for (final r in mealRaw) {
+      for (final r in filteredMealRaw) {
         final d = r['meal_date'] as String;
         final t = r['meal_type'] as String;
         mealByDate.putIfAbsent(d, () => {'LUNCH': 0, 'DINNER': 0});
         mealByDate[d]![t] = (mealByDate[d]![t] ?? 0) + 1;
       }
 
-      // 오늘: 1칸 / 이번주: 월~일 7칸 / 이번달: 평일만
       final days = <_DailyMeal>[];
       var cur = _range.start;
       while (!cur.isAfter(_range.end)) {
@@ -174,26 +182,26 @@ class _TrendScreenState extends State<TrendScreen>
         cur = cur.add(const Duration(days: 1));
       }
 
-      // ── 부서별 집계
+      // ── 부서별 집계 (영양사 제외)
       const deptOrder = [
         'MANAGEMENT', 'PRODUCTION', 'SALES', 'RND',
-        'STEEL', 'BOX', 'DELIVERY', 'SSG', 'CLEANING', 'NUTRITION',
+        'STEEL', 'BOX', 'DELIVERY', 'SSG', 'CLEANING',
       ];
-      final deptCount    = <String, int>{};
+      final deptCount     = <String, int>{};
       final deptHeadcount = <String, int>{};
 
-      // 부서별 인원수 (role 관계없이 dept_category 있는 모든 직원)
       for (final p in profileRaw) {
         final dept = p['dept_category'] as String?;
-        if (dept != null && dept.isNotEmpty) {
+        if (dept != null && dept.isNotEmpty && !_excludedDepts.contains(dept)) {
           deptHeadcount[dept] = (deptHeadcount[dept] ?? 0) + 1;
         }
       }
-      // 부서별 식수 횟수
-      for (final r in mealRaw) {
+      for (final r in filteredMealRaw) {
         final uid  = r['user_id'] as String? ?? '';
-        final dept = userDept[uid] ?? '기타';
-        deptCount[dept] = (deptCount[dept] ?? 0) + 1;
+        final dept = userDept[uid];
+        if (dept != null) {
+          deptCount[dept] = (deptCount[dept] ?? 0) + 1;
+        }
       }
       final deptList = deptOrder
           .where((d) => deptCount.containsKey(d) || deptHeadcount.containsKey(d))
@@ -228,8 +236,10 @@ class _TrendScreenState extends State<TrendScreen>
         _mealTrend      = days;
         _deptMeal       = deptList;
         _attendTrend    = attendDays;
-        _totalLunch     = mealRaw.where((r) => r['meal_type'] == 'LUNCH').length;
-        _totalDinner    = mealRaw.where((r) => r['meal_type'] == 'DINNER').length;
+        _totalLunch     = filteredMealRaw
+            .where((r) => r['meal_type'] == 'LUNCH').length;
+        _totalDinner    = filteredMealRaw
+            .where((r) => r['meal_type'] == 'DINNER').length;
         _totalEmployees = empCount;
         _deptPeriodDays = days.length.clamp(1, 999);
         _loading        = false;
@@ -241,10 +251,6 @@ class _TrendScreenState extends State<TrendScreen>
       setState(() => _loading = false);
     }
   }
-
-  // ──────────────────────────────────────────
-  // Build
-  // ──────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -313,7 +319,6 @@ class _TrendScreenState extends State<TrendScreen>
                   children: [
                     _summaryCards(),
                     const SizedBox(height: 20),
-                    // 오늘 모드에선 일별 추이 차트 불필요
                     if (_period != _Period.today) ...[
                       _sectionTitle(Icons.restaurant_rounded,
                           const Color(0xFFFF7A2F), '일별 식수 현황'),
@@ -324,12 +329,13 @@ class _TrendScreenState extends State<TrendScreen>
                     Row(children: [
                       Expanded(child: _sectionTitle(Icons.bar_chart_rounded,
                           const Color(0xFF2E6BFF), '부서별 식수 현황')),
-                      // 퍼센트 / 건수 토글
                       GestureDetector(
-                        onTap: () => setState(() => _deptShowPercent = !_deptShowPercent),
+                        onTap: () => setState(
+                            () => _deptShowPercent = !_deptShowPercent),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
                             color: _deptShowPercent
                                 ? const Color(0xFF2E6BFF).withOpacity(0.1)
@@ -382,17 +388,15 @@ class _TrendScreenState extends State<TrendScreen>
     );
   }
 
-  // ──────────────────────────────────────────
-  // 요약 카드
-  // ──────────────────────────────────────────
-
   Widget _summaryCards() {
     final totalAttend = _attendTrend.isEmpty
         ? 0
         : _attendTrend.map((e) => e.count).reduce((a, b) => a + b);
-
-    final periodLabel = _period == _Period.today ? '오늘'
-        : _period == _Period.week ? '이번주' : '이번달';
+    final periodLabel = _period == _Period.today
+        ? '오늘'
+        : _period == _Period.week
+            ? '이번주'
+            : '이번달';
 
     return Row(children: [
       Expanded(
@@ -417,10 +421,6 @@ class _TrendScreenState extends State<TrendScreen>
               value: '$totalAttend명')),
     ]);
   }
-
-  // ──────────────────────────────────────────
-  // 식수 라인 차트
-  // ──────────────────────────────────────────
 
   Widget _mealLineChart() {
     if (_mealTrend.isEmpty) return _emptyChart();
@@ -456,9 +456,10 @@ class _TrendScreenState extends State<TrendScreen>
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: (maxY / 4).ceilToDouble().clamp(1, 9999),
-            getDrawingHorizontalLine: (_) =>
-                FlLine(color: Colors.black.withOpacity(0.05), strokeWidth: 1),
+            horizontalInterval:
+                (maxY / 4).ceilToDouble().clamp(1, 9999),
+            getDrawingHorizontalLine: (_) => FlLine(
+                color: Colors.black.withOpacity(0.05), strokeWidth: 1),
           ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
@@ -469,13 +470,14 @@ class _TrendScreenState extends State<TrendScreen>
                 interval: (maxY / 4).ceilToDouble().clamp(1, 9999),
                 getTitlesWidget: (v, _) => Text('${v.toInt()}',
                     style: TextStyle(
-                        fontSize: 10, color: Colors.black.withOpacity(0.4))),
+                        fontSize: 10,
+                        color: Colors.black.withOpacity(0.4))),
               ),
             ),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -492,7 +494,7 @@ class _TrendScreenState extends State<TrendScreen>
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       _period == _Period.week
-                          ? _weekdayLabel(date.weekday) // 월화수목금토일
+                          ? _weekdayLabel(date.weekday)
                           : '${date.day}',
                       style: TextStyle(
                           fontSize: 10,
@@ -554,22 +556,21 @@ class _TrendScreenState extends State<TrendScreen>
     );
   }
 
-  // ──────────────────────────────────────────
-  // 부서별 바 차트
-  // ──────────────────────────────────────────
-
   Widget _deptBarChart() {
     if (_deptMeal.isEmpty) return _emptyChart();
 
-    // 퍼센트 모드: 0~100%, 건수 모드: 실제 건수
     final values = _deptShowPercent
         ? _deptMeal.map((e) => e.rateOf(_deptPeriodDays)).toList()
         : _deptMeal.map((e) => e.total.toDouble()).toList();
 
-    final maxRaw = values.isEmpty ? 10.0 : values.reduce((a, b) => a > b ? a : b);
-    final maxY   = _deptShowPercent
+    final maxRaw = values.isEmpty
+        ? 10.0
+        : values.reduce((a, b) => a > b ? a : b);
+    final maxY = _deptShowPercent
         ? 100.0
-        : (maxRaw * 1.3).ceilToDouble().clamp(5.0, double.infinity);
+        : (maxRaw * 1.3)
+            .ceilToDouble()
+            .clamp(5.0, double.infinity);
 
     const colors = [
       Color(0xFF2E6BFF), Color(0xFFFF7A2F), Color(0xFF7C5CDB),
@@ -587,9 +588,11 @@ class _TrendScreenState extends State<TrendScreen>
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
-              horizontalInterval: _deptShowPercent ? 25 : (maxY / 4).ceilToDouble().clamp(1, 9999),
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: Colors.black.withOpacity(0.05), strokeWidth: 1),
+              horizontalInterval: _deptShowPercent
+                  ? 25
+                  : (maxY / 4).ceilToDouble().clamp(1, 9999),
+              getDrawingHorizontalLine: (_) => FlLine(
+                  color: Colors.black.withOpacity(0.05), strokeWidth: 1),
             ),
             borderData: FlBorderData(show: false),
             titlesData: FlTitlesData(
@@ -597,22 +600,30 @@ class _TrendScreenState extends State<TrendScreen>
                 sideTitles: SideTitles(
                   showTitles: true,
                   reservedSize: 36,
-                  interval: _deptShowPercent ? 25 : (maxY / 4).ceilToDouble().clamp(1, 9999),
+                  interval: _deptShowPercent
+                      ? 25
+                      : (maxY / 4).ceilToDouble().clamp(1, 9999),
                   getTitlesWidget: (v, _) => Text(
                     _deptShowPercent ? '${v.toInt()}%' : '${v.toInt()}',
-                    style: TextStyle(fontSize: 9, color: Colors.black.withOpacity(0.4)),
+                    style: TextStyle(
+                        fontSize: 9,
+                        color: Colors.black.withOpacity(0.4)),
                   ),
                 ),
               ),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false)),
+              topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false)),
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
                   reservedSize: 32,
                   getTitlesWidget: (v, _) {
                     final i = v.toInt();
-                    if (i < 0 || i >= _deptMeal.length) return const SizedBox.shrink();
+                    if (i < 0 || i >= _deptMeal.length) {
+                      return const SizedBox.shrink();
+                    }
                     return Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(_deptShort(_deptMeal[i].dept),
@@ -635,7 +646,10 @@ class _TrendScreenState extends State<TrendScreen>
                     '${_deptFull(d.dept)}\n'
                     '${d.total}건  |  ${d.headcount}명\n'
                     '참여율 $pct%',
-                    const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                    const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
                   );
                 },
               ),
@@ -650,7 +664,8 @@ class _TrendScreenState extends State<TrendScreen>
                     toY: val,
                     color: color,
                     width: 18,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(6)),
                     backDrawRodData: BackgroundBarChartRodData(
                       show: true,
                       toY: maxY,
@@ -664,14 +679,14 @@ class _TrendScreenState extends State<TrendScreen>
         ),
       ),
       const SizedBox(height: 12),
-      // 부서별 상세 리스트
       ..._deptMeal.asMap().entries.map((e) {
         final color = colors[e.key % colors.length];
         final d = e.value;
         final pct = d.rateOf(_deptPeriodDays);
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -679,25 +694,32 @@ class _TrendScreenState extends State<TrendScreen>
           ),
           child: Row(children: [
             Container(
-              width: 8, height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              width: 8,
+              height: 8,
+              decoration:
+                  BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 10),
             Text(_deptFull(d.dept),
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700)),
             const SizedBox(width: 6),
             Text('${d.headcount}명',
-                style: TextStyle(fontSize: 11, color: Colors.black.withOpacity(0.4))),
+                style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.black.withOpacity(0.4))),
             const Spacer(),
             Text('${d.total}건',
                 style: TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                     color: Colors.black.withOpacity(0.5))),
             const SizedBox(width: 10),
-            // 퍼센트 바
             SizedBox(
               width: 80,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(3),
                   child: LinearProgressIndicator(
@@ -710,7 +732,9 @@ class _TrendScreenState extends State<TrendScreen>
                 const SizedBox(height: 3),
                 Text('${pct.toStringAsFixed(1)}%',
                     style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w800, color: color)),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: color)),
               ]),
             ),
           ]),
@@ -718,10 +742,6 @@ class _TrendScreenState extends State<TrendScreen>
       }),
     ]);
   }
-
-  // ──────────────────────────────────────────
-  // 출근 라인 차트
-  // ──────────────────────────────────────────
 
   Widget _attendLineChart() {
     if (_attendTrend.isEmpty) return _emptyChart();
@@ -750,9 +770,10 @@ class _TrendScreenState extends State<TrendScreen>
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: (maxY / 4).ceilToDouble().clamp(1, 9999),
-            getDrawingHorizontalLine: (_) =>
-                FlLine(color: Colors.black.withOpacity(0.05), strokeWidth: 1),
+            horizontalInterval:
+                (maxY / 4).ceilToDouble().clamp(1, 9999),
+            getDrawingHorizontalLine: (_) => FlLine(
+                color: Colors.black.withOpacity(0.05), strokeWidth: 1),
           ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
@@ -763,13 +784,14 @@ class _TrendScreenState extends State<TrendScreen>
                 interval: (maxY / 4).ceilToDouble().clamp(1, 9999),
                 getTitlesWidget: (v, _) => Text('${v.toInt()}',
                     style: TextStyle(
-                        fontSize: 10, color: Colors.black.withOpacity(0.4))),
+                        fontSize: 10,
+                        color: Colors.black.withOpacity(0.4))),
               ),
             ),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false)),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -786,7 +808,7 @@ class _TrendScreenState extends State<TrendScreen>
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       _period == _Period.week
-                          ? _weekdayLabel(date.weekday) // 월화수목금토일
+                          ? _weekdayLabel(date.weekday)
                           : '${date.day}',
                       style: TextStyle(
                           fontSize: 10,
@@ -817,10 +839,6 @@ class _TrendScreenState extends State<TrendScreen>
       ),
     );
   }
-
-  // ──────────────────────────────────────────
-  // 헬퍼
-  // ──────────────────────────────────────────
 
   Widget _sectionTitle(IconData icon, Color color, String title) {
     return Row(children: [
@@ -854,7 +872,6 @@ class _TrendScreenState extends State<TrendScreen>
     );
   }
 
-  // 이번주: 월~일 7칸
   String _weekdayLabel(int wd) {
     const labels = {
       1: '월', 2: '화', 3: '수', 4: '목', 5: '금', 6: '토', 7: '일'
@@ -864,32 +881,18 @@ class _TrendScreenState extends State<TrendScreen>
 
   String _deptFull(String dept) {
     const m = {
-      'MANAGEMENT': '관리부',
-      'PRODUCTION': '생산관리부',
-      'SALES': '영업부',
-      'RND': '연구소',
-      'STEEL': '스틸생산부',
-      'BOX': '박스생산부',
-      'DELIVERY': '포장납품부',
-      'SSG': '에스에스지',
-      'CLEANING': '환경미화',
-      'NUTRITION': '영양사',
+      'MANAGEMENT': '관리부', 'PRODUCTION': '생산관리부', 'SALES': '영업부',
+      'RND': '연구소', 'STEEL': '스틸생산부', 'BOX': '박스생산부',
+      'DELIVERY': '포장납품부', 'SSG': '에스에스지', 'CLEANING': '환경미화',
     };
     return m[dept] ?? dept;
   }
 
   String _deptShort(String dept) {
     const m = {
-      'MANAGEMENT': '관리부',
-      'PRODUCTION': '생산관리',
-      'SALES': '영업부',
-      'RND': '연구소',
-      'STEEL': '스틸',
-      'BOX': '박스',
-      'DELIVERY': '납품',
-      'SSG': 'SSG',
-      'CLEANING': '미화',
-      'NUTRITION': '영양사',
+      'MANAGEMENT': '관리부', 'PRODUCTION': '생산관리', 'SALES': '영업부',
+      'RND': '연구소', 'STEEL': '스틸', 'BOX': '박스',
+      'DELIVERY': '납품', 'SSG': 'SSG', 'CLEANING': '미화',
     };
     return m[dept] ?? dept;
   }

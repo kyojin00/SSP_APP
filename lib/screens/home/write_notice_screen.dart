@@ -37,7 +37,6 @@ class _WriteNoticeScreenState extends State<WriteNoticeScreen> {
     {'value': 'TEST',       'label': 'TEST'},
   ];
 
-  static const String _webhookSecret = 'notice_secret_2026_sspapp';
   static const _primary  = Color(0xFF2E6BFF);
   static const _primary2 = Color(0xFF4FB2FF);
   static const _bg       = Color(0xFFF6F8FC);
@@ -94,43 +93,21 @@ class _WriteNoticeScreenState extends State<WriteNoticeScreen> {
         imageUrl = supabase.storage.from('notice-images').getPublicUrl(path);
       }
 
-      final inserted = await supabase.from('notices').insert({
+      // INSERT 시 DB 트리거(trg_notice_onesignal)가 자동으로 알림 발송
+      await supabase.from('notices').insert({
         'title': title, 'content': content,
         'target_category': _selectedCategory,
         'author_id': user.id, 'image_url': imageUrl,
-      }).select().single();
-
-      final pushOk = await _triggerPushNotification(
-        noticeId: inserted['id'], title: title,
-        content: content, category: _selectedCategory,
-      );
+      });
 
       if (!mounted) return;
-      Navigator.pop(context, {'success': true, 'pushOk': pushOk});
+      Navigator.pop(context, {'success': true, 'pushOk': true});
     } catch (e) {
       if (!mounted) return;
       _showSnackBar("저장 실패: $e");
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  Future<bool> _triggerPushNotification({
-    required dynamic noticeId, required String title,
-    required String content,  required String category,
-  }) async {
-    try {
-      final res = await Supabase.instance.client.functions.invoke(
-        'send_notice_onesignal',
-        headers: {'x-webhook-secret': _webhookSecret},
-        body: {
-          'notice_id': noticeId, 'title': title,
-          'content': content, 'target_category': category,
-          'secret': _webhookSecret,
-        },
-      );
-      return res.status == 200 || res.status == 207;
-    } catch (_) { return false; }
   }
 
   void _showSnackBar(String message) {

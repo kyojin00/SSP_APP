@@ -244,7 +244,7 @@ class AppStrings {
   static const leaveTypePublic     = {'ko': '공가',                  'en': 'Official',                  'vi': 'Cong vu',                      'uz': 'Rasmiy',                     'km': 'ផ្លូវការ'};
   static const leaveTypeEvent      = {'ko': '경조사',                'en': 'Special',                   'vi': 'Dac biet',                     'uz': 'Maxsus',                     'km': 'ពិសេស'};
 
-// ── 비품/고장 신고
+  // ── 비품/고장 신고
   static const repairTitle        = {'ko': '고장 및 비품 신고',           'en': 'Repair & Equipment',       'vi': 'Bao hong & Trang thiet bi', 'uz': "Ta'mirlash va jihozlar",    'km': 'ជួសជុល & ឧបករណ៍'};
   static const repairDialog       = {'ko': '고장 / 비품 신고',            'en': 'Report Issue',             'vi': 'Bao cao su co',             'uz': "Muammoni bildirish",        'km': 'រាយការណ៍បញ្ហា'};
   static const repairCategory     = {'ko': '카테고리',                    'en': 'Category',                 'vi': 'Danh muc',                  'uz': 'Kategoriya',                'km': 'ប្រភេទ'};
@@ -264,4 +264,133 @@ class AppStrings {
   static const repairEmpty        = {'ko': '해당하는 신고 내역이 없습니다.', 'en': 'No reports found.',      'vi': 'Khong co bao cao nao.',     'uz': "Hisobotlar yo'q.",           'km': 'រកមិនឃើញរបាយការណ៍។'};
   static const repairChangeStatus = {'ko': '상태 변경',                   'en': 'Change Status',            'vi': 'Doi trang thai',            'uz': 'Holatni o\'zgartirish',     'km': 'ផ្លាស់ប្ដូរស្ថានភាព'};
   static const repairStatusChanged = {'ko': "상태가 '{s}'(으)로 변경되었습니다.", 'en': "Status changed to '{s}'.", 'vi': "Trang thai da doi thanh '{s}'.", 'uz': "Holat '{s}' ga o'zgartirildi.", 'km': "ស្ថានភាពផ្លាស់ប្ដូរទៅ '{s}'។"};
+
+  // ── 베란다 청소
+  static const cleaningTitle = {
+    'ko': '베란다 청소 로테이션', 'en': 'Balcony Cleaning Rotation',
+    'vi': 'Lịch dọn ban công',   'uz': 'Balkon tozalash navbati',
+    'km': 'វេនសម្អាតរបងជ្រោង',
+  };
+  static const cleaningTabThisWeek = {
+    'ko': '이번 주', 'en': 'This Week',
+    'vi': 'Tuần này', 'uz': 'Bu hafta', 'km': 'សប្តាហ៍នេះ',
+  };
+  static const cleaningTabRotation = {
+    'ko': '순번 관리', 'en': 'Rotation',
+    'vi': 'Quản lý thứ tự', 'uz': 'Navbat', 'km': 'គ្រប់គ្រងវេន',
+  };
+  static const cleaningTabHistory = {
+    'ko': '전체 기록', 'en': 'History',
+    'vi': 'Lịch sử', 'uz': 'Tarix', 'km': 'ប្រវត្តិ',
+  };
+  static const cleaningWeekRange = {
+    'ko': '청소 담당', 'en': 'Cleaning Duty',
+    'vi': 'Phân công dọn dẹp', 'uz': 'Tozalash navbati', 'km': 'វេនសម្អាត',
+  };
+  static const cleaningNoScheduleAdmin = {
+    'ko': '이번 주 스케줄이 없습니다.\n아래 버튼으로 생성해주세요.',
+    'en': 'No schedule this week.\nPlease generate below.',
+    'vi': 'Chưa có lịch tuần này.\nVui lòng tạo bên dưới.',
+    'uz': 'Bu hafta jadval yo\'q.\nQuyida yarating.',
+    'km': 'គ្មានកាលវិភាគសប្តាហ៍នេះ។\nសូមបង្កើតខាងក្រោម។',
+  };
+  static const cleaningNoSchedule = {
+    'ko': '이번 주 스케줄이 아직 없습니다.',
+    'en': 'No schedule yet this week.',
+    'vi': 'Chưa có lịch tuần này.',
+    'uz': 'Bu hafta hali jadval yo\'q.',
+    'km': 'មិនទាន់មានកាលវិភាគសប្តាហ៍នេះ។',
+  };
+  static const cleaningGenerating = {
+    'ko': '생성 중...', 'en': 'Generating...',
+    'vi': 'Đang tạo...', 'uz': 'Yaratilmoqda...', 'km': 'កំពុងបង្កើត...',
+  };
+  static const cleaningGenerate = {
+    'ko': '이번 주 스케줄 생성', 'en': 'Generate This Week',
+    'vi': 'Tạo lịch tuần này', 'uz': 'Bu haftani yaratish',
+    'km': 'បង្កើតកាលវិភាគសប្តាហ៍នេះ',
+  };
+  static const cleaningGenerated = {
+    'ko': '이번 주 스케줄이 생성되었습니다 ✅', 'en': 'Schedule generated ✅',
+    'vi': 'Đã tạo lịch tuần này ✅', 'uz': 'Jadval yaratildi ✅',
+    'km': 'បានបង្កើតកាលវិភាគ ✅',
+  };
+  static const cleaningGenerateFail = {
+    'ko': '생성 실패', 'en': 'Generation failed',
+    'vi': 'Tạo thất bại', 'uz': 'Yaratish muvaffaqiyatsiz',
+    'km': 'បង្កើតបរាជ័យ',
+  };
+  static const cleaningChangeDate = {
+    'ko': '날짜 변경', 'en': 'Change Date',
+    'vi': 'Đổi ngày', 'uz': 'Sanani o\'zgartirish',
+    'km': 'ផ្លាស់ប្តូរកាលបរិច្ឆេទ',
+  };
+  static const cleaningDone = {
+    'ko': '완료', 'en': 'Done',
+    'vi': 'Hoàn thành', 'uz': 'Bajarildi', 'km': 'រួចរាល់',
+  };
+  static const cleaningPending = {
+    'ko': '대기중', 'en': 'Pending',
+    'vi': 'Chờ xử lý', 'uz': 'Kutilmoqda', 'km': 'កំពុងរង់ចាំ',
+  };
+  static const cleaningWeekend = {
+    'ko': '주말', 'en': 'Weekend',
+    'vi': 'Cuối tuần', 'uz': 'Dam olish kuni', 'km': 'ចុងសប្តាហ៍',
+  };
+  static const cleaningUndone = {
+    'ko': '완료 취소', 'en': 'Undo',
+    'vi': 'Hủy hoàn thành', 'uz': 'Bekor qilish', 'km': 'បោះបង់ការបញ្ចប់',
+  };
+  static const cleaningCheck = {
+    'ko': '완료 체크', 'en': 'Mark Done',
+    'vi': 'Đánh dấu hoàn thành', 'uz': 'Bajarildi deb belgilash',
+    'km': 'សម្គាល់ថារួចរាល់',
+  };
+  static const cleaningPhotoUpload = {
+    'ko': '사진 등록', 'en': 'Upload Photo',
+    'vi': 'Tải ảnh', 'uz': 'Rasm yuklash', 'km': 'បញ្ចូលរូបថត',
+  };
+  static const cleaningPhotoUploaded = {
+    'ko': '사진이 등록되었습니다 📸', 'en': 'Photo uploaded 📸',
+    'vi': 'Đã tải ảnh 📸', 'uz': 'Rasm yuklandi 📸', 'km': 'បានបញ្ចូលរូបថត 📸',
+  };
+  static const cleaningOrderSaved = {
+    'ko': '순번이 저장되었습니다 💾', 'en': 'Order saved 💾',
+    'vi': 'Đã lưu thứ tự 💾', 'uz': 'Tartib saqlandi 💾', 'km': 'បានរក្សាទុកវេន 💾',
+  };
+  static const cleaningNoHistory = {
+    'ko': '기록이 없습니다.', 'en': 'No history.',
+    'vi': 'Không có lịch sử.', 'uz': 'Tarix yo\'q.', 'km': 'គ្មានប្រវត្តិ។',
+  };
+  static const cleaningResidents = {
+    'ko': '청소 담당 거주자', 'en': 'Cleaning Duty Residents',
+    'vi': 'Cư dân phụ trách dọn dẹp', 'uz': 'Tozalash uchun mas\'ul sakinlar',
+    'km': 'អ្នករស់នៅទទួលខុសត្រូវវេន',
+  };
+  static const cleaningNoResidents = {
+    'ko': '등록된 거주자가 없습니다.', 'en': 'No residents registered.',
+    'vi': 'Không có cư dân nào.', 'uz': 'Sakinlar ro\'yxatga olinmagan.',
+    'km': 'គ្មានអ្នករស់នៅត្រូវបានចុះឈ្មោះ។',
+  };
+  static const cleaningMerged = {
+    'ko': '1인실 묶음', 'en': 'Single rooms (merged)',
+    'vi': 'Phòng đơn (gộp)', 'uz': 'Bir kishilik xona (birlashtirilgan)',
+    'km': 'បន្ទប់តែម្នាក់ (បញ្ចូលគ្នា)',
+  };
+  static const cleaningSave = {
+    'ko': '저장', 'en': 'Save',
+    'vi': 'Lưu', 'uz': 'Saqlash', 'km': 'រក្សាទុក',
+  };
+  static const cleaningDate = {
+    'ko': '청소일', 'en': 'Cleaning Date',
+    'vi': 'Ngày dọn dẹp', 'uz': 'Tozalash kuni', 'km': 'ថ្ងៃសម្អាត',
+  };
+  static const cleaningFloorRotation = {
+    'ko': '층 로테이션', 'en': 'F Rotation',
+    'vi': 'Tầng - luân phiên', 'uz': 'qavat navbati', 'km': 'វេនជាន់',
+  };
+  static const cleaningRooms = {
+    'ko': '개 호실', 'en': ' rooms',
+    'vi': ' phòng', 'uz': ' xona', 'km': ' បន្ទប់',
+  };
 }

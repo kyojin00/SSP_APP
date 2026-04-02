@@ -16,13 +16,6 @@ class LeaveRealtimeTab extends StatelessWidget {
     required this.onRefresh,
   }) : super(key: key);
 
-  static const Map<String, String> _deptLabels = {
-    'MANAGEMENT': 'MANAGEMENT', 'PRODUCTION': 'PRODUCTION',
-    'SALES': 'SALES', 'RND': 'RND', 'STEEL': 'STEEL',
-    'BOX': 'BOX', 'DELIVERY': 'DELIVERY', 'SSG': 'SSG',
-    'CLEANING': 'CLEANING', 'NUTRITION': 'NUTRITION',
-  };
-
   String _deptLabel(BuildContext context, String dept) {
     const m = {
       'MANAGEMENT': AppStrings.deptManagement,
@@ -41,36 +34,68 @@ class LeaveRealtimeTab extends StatelessWidget {
   }
 
   String _leaveTypeLabel(BuildContext context, String type) => switch (type) {
-    'HALF'   => context.tr(AppStrings.leaveTypeHalf),
-    'PUBLIC' => context.tr(AppStrings.leaveTypePublic),
-    'EVENT'  => context.tr(AppStrings.leaveTypeEvent),
-    _        => context.tr(AppStrings.leaveTypeAnnual),
+    'HALF'     => context.tr(AppStrings.leaveTypeHalf),
+    'PUBLIC'   => context.tr(AppStrings.leaveTypePublic),
+    'EVENT'    => context.tr(AppStrings.leaveTypeEvent),
+    'TRAINING' => context.tr({'ko': '교육', 'en': 'Training',
+                               'vi': 'Dao tao', 'uz': "Ta'lim",
+                               'km': 'បណ្តុះបណ្តាល'}),
+    'SICK'     => context.tr({'ko': '병가', 'en': 'Sick Leave',
+                               'vi': 'Nghi benh', 'uz': 'Kasal',
+                               'km': 'ច្ឈប់ជំងឺ'}),
+    _          => context.tr(AppStrings.leaveTypeAnnual),
   };
 
   Color _leaveTypeColor(String type) => switch (type) {
-    'HALF'   => const Color(0xFFFF9500),
-    'PUBLIC' => const Color(0xFF7C5CDB),
-    'EVENT'  => const Color(0xFFFF4D64),
-    _        => const Color(0xFF2E6BFF),
+    'HALF'     => const Color(0xFFFF9500),
+    'PUBLIC'   => const Color(0xFF7C5CDB),
+    'EVENT'    => const Color(0xFFFF4D64),
+    'TRAINING' => const Color(0xFF00897B),
+    'SICK'     => Colors.blue,
+    _          => const Color(0xFF2E6BFF),
   };
 
+  /// 오늘 휴가 중 — 몇 일 남았는지 (예정 기준)
   String _daysRemaining(BuildContext context, String endDate) {
     try {
       final end   = DateTime.parse(endDate);
-      final today = DateTime.now();
-      final diff  = end.difference(DateTime(today.year, today.month, today.day)).inDays;
-      if (diff == 0) return context.tr(AppStrings.leaveReturnToday);
-      return context.tr(AppStrings.leaveReturnDays).replaceAll('{n}', '${diff + 1}');
+      final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      final diff  = end.difference(today).inDays;
+      if (diff == 0) {
+        return context.tr({'ko': '오늘 예정', 'en': 'Until today',
+                           'vi': 'Hom nay', 'uz': 'Bugun', 'km': 'ថ្ងៃនេះ'});
+      }
+      return context.tr({
+        'ko': '${diff + 1}일 예정',
+        'en': '${diff + 1}d left',
+        'vi': 'Con ${diff + 1} ngay',
+        'uz': '${diff + 1} kun qoldi',
+        'km': 'នៅ ${diff + 1} ថ្ងៃ',
+      });
     } catch (_) { return ''; }
   }
 
+  /// 예정 휴가 — 며칠 후 시작인지
   String _daysUntil(BuildContext context, String startDate) {
     try {
       final start = DateTime.parse(startDate);
-      final today = DateTime.now();
-      final diff  = start.difference(DateTime(today.year, today.month, today.day)).inDays;
-      if (diff == 1) return context.tr(AppStrings.leaveReturnTomorrow);
-      return context.tr(AppStrings.leaveReturnDays).replaceAll('{n}', '$diff');
+      final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      final diff  = start.difference(today).inDays;
+      if (diff == 0) {
+        return context.tr({'ko': '오늘 예정', 'en': 'Today',
+                           'vi': 'Hom nay', 'uz': 'Bugun', 'km': 'ថ្ងៃនេះ'});
+      }
+      if (diff == 1) {
+        return context.tr({'ko': '내일 예정', 'en': 'Tomorrow',
+                           'vi': 'Ngay mai', 'uz': 'Ertaga', 'km': 'ថ្ងៃស្អែក'});
+      }
+      return context.tr({
+        'ko': '$diff일 후 예정',
+        'en': 'In ${diff}d',
+        'vi': 'Sau $diff ngay',
+        'uz': '$diff kundan keyin',
+        'km': 'ក្នុង $diff ថ្ងៃ',
+      });
     } catch (_) { return ''; }
   }
 
@@ -121,9 +146,9 @@ class LeaveRealtimeTab extends StatelessWidget {
 
           // 오늘 휴가 중
           attendanceSectionHeader(
-            context.tr(AppStrings.leaveOnToday) +
-                ' (${onLeaveToday.length}${context.tr(AppStrings.members)})',
-            Icons.flight_takeoff_rounded, Colors.indigo),
+              context.tr(AppStrings.leaveOnToday) +
+                  ' (${onLeaveToday.length}${context.tr(AppStrings.members)})',
+              Icons.flight_takeoff_rounded, Colors.indigo),
           const SizedBox(height: 12),
           if (onLeaveToday.isEmpty)
             _emptyState(context, context.tr(AppStrings.leaveOnTodayEmpty),
@@ -135,9 +160,9 @@ class LeaveRealtimeTab extends StatelessWidget {
 
           // 예정된 휴가
           attendanceSectionHeader(
-            context.tr(AppStrings.leaveUpcomingCount)
-                .replaceAll('{n}', '${upcomingLeaves.length}'),
-            Icons.event_rounded, Colors.orange),
+              context.tr(AppStrings.leaveUpcomingCount)
+                  .replaceAll('{n}', '${upcomingLeaves.length}'),
+              Icons.event_rounded, Colors.orange),
           const SizedBox(height: 12),
           if (upcomingLeaves.isEmpty)
             _emptyState(context, context.tr(AppStrings.leaveUpcomingEmpty),
@@ -214,7 +239,8 @@ class LeaveRealtimeTab extends StatelessWidget {
             const SizedBox(height: 3),
             Text(
               '${_deptLabel(context, dept)}  ·  $dateStr  ($daysStr)',
-              style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.45)),
+              style: TextStyle(
+                  fontSize: 12, color: Colors.black.withOpacity(0.45)),
             ),
           ]),
         ),

@@ -83,14 +83,16 @@ class _VehicleLogHistoryScreenState
         backgroundColorHex: xl.ExcelColor.fromHexString('#F0F2F7'),
         horizontalAlign: xl.HorizontalAlign.Center,
       );
-      final centerStyle = xl.CellStyle(horizontalAlign: xl.HorizontalAlign.Center);
+      final centerStyle = xl.CellStyle(
+          horizontalAlign: xl.HorizontalAlign.Center);
       final numberStyle = xl.CellStyle(
           horizontalAlign: xl.HorizontalAlign.Right,
           numberFormat: xl.NumFormat.custom(formatCode: '#,##0'));
 
       // 제목
       sheet.merge(
-          xl.CellIndex.indexByString('A1'), xl.CellIndex.indexByString('K1'));
+          xl.CellIndex.indexByString('A1'),
+          xl.CellIndex.indexByString('M1'));
       final titleCell = sheet.cell(xl.CellIndex.indexByString('A1'));
       titleCell.value = xl.TextCellValue(
           '${widget.vehicle.name} (${widget.vehicle.plateNumber}) - '
@@ -102,10 +104,11 @@ class _VehicleLogHistoryScreenState
       );
       sheet.setRowHeight(0, 28);
 
-      // 컬럼 헤더
+      // 컬럼 헤더 (출발시간·도착시간 추가)
       final headers = [
         'No', '날짜', '운전자', '부서',
         '출발지', '도착지', '사용목적',
+        '출발시간', '도착시간',                          // ← 추가
         '출발계기판(km)', '도착계기판(km)', '주행거리(km)', '상태',
       ];
       for (var c = 0; c < headers.length; c++) {
@@ -119,43 +122,51 @@ class _VehicleLogHistoryScreenState
       // 데이터
       int totalDistance = 0;
       for (var i = 0; i < _logs.length; i++) {
-        final log      = _logs[i];
-        final row      = i + 3;
-        final isDone   = log['status'] == 'DONE';
-        final distance = log['distance'] as int?;
+        final log        = _logs[i];
+        final row        = i + 3;
+        final isDone     = log['status'] == 'DONE';
+        final distance   = log['distance'] as int?;
+        final departTime = log['depart_time'] as String? ?? '';
+        final returnTime = log['return_time'] as String? ?? '';
         if (distance != null) totalDistance += distance;
 
         final rowData = [
-          xl.IntCellValue(i + 1),
-          xl.TextCellValue(log['use_date'] ?? ''),
-          xl.TextCellValue(log['full_name'] ?? '-'),
-          xl.TextCellValue(_deptLabel(log['dept_category'] ?? '')),
-          xl.TextCellValue(log['departure'] ?? ''),
-          xl.TextCellValue(log['destination'] ?? ''),
-          xl.TextCellValue(log['purpose'] ?? ''),
-          xl.IntCellValue(log['mileage_before'] ?? 0),
+          xl.IntCellValue(i + 1),                                      // No
+          xl.TextCellValue(log['use_date'] ?? ''),                     // 날짜
+          xl.TextCellValue(log['full_name'] ?? '-'),                   // 운전자
+          xl.TextCellValue(_deptLabel(log['dept_category'] ?? '')),    // 부서
+          xl.TextCellValue(log['departure'] ?? ''),                    // 출발지
+          xl.TextCellValue(log['destination'] ?? ''),                  // 도착지
+          xl.TextCellValue(log['purpose'] ?? ''),                      // 사용목적
+          xl.TextCellValue(departTime),                                // 출발시간 ← 추가
+          xl.TextCellValue(returnTime.isNotEmpty ? returnTime : '-'),  // 도착시간 ← 추가
+          xl.IntCellValue(log['mileage_before'] ?? 0),                 // 출발계기판
           log['mileage_after'] != null
               ? xl.IntCellValue(log['mileage_after'] as int)
-              : xl.TextCellValue('-'),
-          distance != null ? xl.IntCellValue(distance) : xl.TextCellValue('-'),
-          xl.TextCellValue(isDone ? '완료' : '운행중'),
+              : xl.TextCellValue('-'),                                 // 도착계기판
+          distance != null
+              ? xl.IntCellValue(distance)
+              : xl.TextCellValue('-'),                                 // 주행거리
+          xl.TextCellValue(isDone ? '완료' : '운행중'),                 // 상태
         ];
 
         for (var c = 0; c < rowData.length; c++) {
           final cell = sheet.cell(
               xl.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
           cell.value = rowData[c];
-          if (c >= 7 && c <= 9 && rowData[c] is xl.IntCellValue) {
+          // 숫자 컬럼 (출발계기판:9, 도착계기판:10, 주행거리:11)
+          if ([9, 10, 11].contains(c) && rowData[c] is xl.IntCellValue) {
             cell.cellStyle = numberStyle;
-          } else if (c == 0) {
+          } else if (c == 0 || c == 7 || c == 8) {
+            // No, 출발시간, 도착시간 → 가운데 정렬
             cell.cellStyle = centerStyle;
           }
           if (i % 2 == 1) {
             cell.cellStyle = xl.CellStyle(
               backgroundColorHex: xl.ExcelColor.fromHexString('#F8F9FC'),
-              horizontalAlign: c == 0
+              horizontalAlign: c == 0 || c == 7 || c == 8
                   ? xl.HorizontalAlign.Center
-                  : c >= 7
+                  : [9, 10, 11].contains(c)
                       ? xl.HorizontalAlign.Right
                       : xl.HorizontalAlign.Left,
             );
@@ -167,15 +178,16 @@ class _VehicleLogHistoryScreenState
       final sumRow = _logs.length + 3;
       sheet.merge(
         xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sumRow),
-        xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: sumRow),
+        xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: sumRow),
       );
       final sumLabelCell = sheet.cell(
           xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: sumRow));
-      sumLabelCell.value = xl.TextCellValue('총 ${_logs.length}건 운행');
+      sumLabelCell.value =
+          xl.TextCellValue('총 ${_logs.length}건 운행');
       sumLabelCell.cellStyle = subHeaderStyle;
 
       final sumCell = sheet.cell(
-          xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: sumRow));
+          xl.CellIndex.indexByColumnRow(columnIndex: 11, rowIndex: sumRow));
       sumCell.value = xl.IntCellValue(totalDistance);
       sumCell.cellStyle = xl.CellStyle(
         bold: true,
@@ -185,12 +197,26 @@ class _VehicleLogHistoryScreenState
       );
 
       final sumUnitCell = sheet.cell(
-          xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: sumRow));
+          xl.CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: sumRow));
       sumUnitCell.value = xl.TextCellValue('km');
       sumUnitCell.cellStyle = subHeaderStyle;
 
-      // 컬럼 너비
-      final colWidths = [6.0, 12.0, 10.0, 12.0, 14.0, 14.0, 18.0, 16.0, 16.0, 14.0, 8.0];
+      // 컬럼 너비 (출발시간·도착시간 컬럼 추가)
+      final colWidths = [
+        6.0,  // No
+        12.0, // 날짜
+        10.0, // 운전자
+        12.0, // 부서
+        14.0, // 출발지
+        14.0, // 도착지
+        18.0, // 사용목적
+        10.0, // 출발시간 ← 추가
+        10.0, // 도착시간 ← 추가
+        16.0, // 출발계기판
+        16.0, // 도착계기판
+        14.0, // 주행거리
+        8.0,  // 상태
+      ];
       for (var c = 0; c < colWidths.length; c++) {
         sheet.setColumnWidth(c, colWidths[c]);
       }
@@ -203,7 +229,8 @@ class _VehicleLogHistoryScreenState
       final url    = html.Url.createObjectUrlFromBlob(blob);
       final anchor = html.AnchorElement(href: url)
         ..setAttribute('download',
-            '차량일지_${widget.vehicle.name}_${DateFormat('yyyyMM').format(_selectedMonth)}.xlsx')
+            '차량일지_${widget.vehicle.name}_'
+            '${DateFormat('yyyyMM').format(_selectedMonth)}.xlsx')
         ..click();
       html.Url.revokeObjectUrl(url);
 
@@ -212,7 +239,8 @@ class _VehicleLogHistoryScreenState
             style: TextStyle(fontWeight: FontWeight.w700)),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       ));
     } catch (e) {
@@ -222,7 +250,8 @@ class _VehicleLogHistoryScreenState
             style: const TextStyle(fontWeight: FontWeight.w700)),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.redAccent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       ));
     }
@@ -238,7 +267,8 @@ class _VehicleLogHistoryScreenState
     return m[dept] ?? dept;
   }
 
-  void _prevMonth() {    setState(() => _selectedMonth =
+  void _prevMonth() {
+    setState(() => _selectedMonth =
         DateTime(_selectedMonth.year, _selectedMonth.month - 1));
     _loadLogs();
   }
@@ -277,7 +307,8 @@ class _VehicleLogHistoryScreenState
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFF0F2F8)),
+          child:
+              Container(height: 1, color: const Color(0xFFF0F2F8)),
         ),
       ),
       body: Column(children: [
@@ -302,7 +333,8 @@ class _VehicleLogHistoryScreenState
               ),
             ]),
             const SizedBox(height: 8),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
               _statChip('운행 건수', '${_logs.length}건', Colors.orange),
               _statChip('총 주행거리', '${totalDistance}km',
                   const Color(0xFF2E6BFF)),
@@ -315,21 +347,25 @@ class _VehicleLogHistoryScreenState
               ? const Center(child: CircularProgressIndicator(
                   color: Color(0xFF2E6BFF)))
               : _logs.isEmpty
-                  ? Center(child: Column(
-                      mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.article_outlined, size: 48,
-                          color: Colors.grey.withOpacity(0.4)),
-                      const SizedBox(height: 12),
-                      Text('이번 달 운행 기록이 없습니다',
-                          style: TextStyle(
-                              color: Colors.black.withOpacity(0.35),
-                              fontWeight: FontWeight.w600)),
-                    ]))
+                  ? Center(
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                        Icon(Icons.article_outlined,
+                            size: 48,
+                            color: Colors.grey.withOpacity(0.4)),
+                        const SizedBox(height: 12),
+                        Text('이번 달 운행 기록이 없습니다',
+                            style: TextStyle(
+                                color: Colors.black.withOpacity(0.35),
+                                fontWeight: FontWeight.w600)),
+                      ]))
                   : RefreshIndicator(
                       color: const Color(0xFF2E6BFF),
                       onRefresh: _loadLogs,
                       child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                        padding:
+                            const EdgeInsets.fromLTRB(16, 16, 16, 40),
                         itemCount: _logs.length,
                         itemBuilder: (_, i) => _logCard(_logs[i]),
                       ),
@@ -341,11 +377,16 @@ class _VehicleLogHistoryScreenState
 
   Widget _statChip(String label, String value, Color color) {
     return Column(children: [
-      Text(value, style: TextStyle(
-          fontSize: 20, fontWeight: FontWeight.w900, color: color)),
-      Text(label, style: TextStyle(
-          fontSize: 11, color: Colors.black.withOpacity(0.4),
-          fontWeight: FontWeight.w600)),
+      Text(value,
+          style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: color)),
+      Text(label,
+          style: TextStyle(
+              fontSize: 11,
+              color: Colors.black.withOpacity(0.4),
+              fontWeight: FontWeight.w600)),
     ]);
   }
 
@@ -372,25 +413,33 @@ class _VehicleLogHistoryScreenState
             color: isDriving
                 ? Colors.orange.withOpacity(0.3)
                 : Colors.transparent),
-        boxShadow: [BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          // 날짜 + 출발시간 → 귀환시간
+      child:
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(date, style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w800,
-                color: Color(0xFF1A1D2E))),
+        Row(children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(date,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1D2E))),
             const SizedBox(height: 2),
             Row(children: [
               if (departTime.isNotEmpty) ...[
-                const Icon(Icons.login_rounded, size: 11, color: Colors.orange),
+                const Icon(Icons.login_rounded,
+                    size: 11, color: Colors.orange),
                 const SizedBox(width: 3),
-                Text(departTime, style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700,
-                    color: Colors.orange)),
+                Text(departTime,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.orange)),
               ],
               if (departTime.isNotEmpty && returnTime.isNotEmpty)
                 const Padding(
@@ -399,12 +448,14 @@ class _VehicleLogHistoryScreenState
                       size: 10, color: Colors.grey),
                 ),
               if (returnTime.isNotEmpty) ...[
-                const Icon(Icons.logout_rounded, size: 11,
-                    color: Color(0xFF2E6BFF)),
+                const Icon(Icons.logout_rounded,
+                    size: 11, color: Color(0xFF2E6BFF)),
                 const SizedBox(width: 3),
-                Text(returnTime, style: const TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w700,
-                    color: Color(0xFF2E6BFF))),
+                Text(returnTime,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2E6BFF))),
               ],
               if (isDriving && departTime.isNotEmpty) ...[
                 const SizedBox(width: 6),
@@ -415,7 +466,8 @@ class _VehicleLogHistoryScreenState
                       color: Colors.orange.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4)),
                   child: const Text('운행 중',
-                      style: TextStyle(fontSize: 9,
+                      style: TextStyle(
+                          fontSize: 9,
                           fontWeight: FontWeight.w700,
                           color: Colors.orange)),
                 ),
@@ -441,11 +493,15 @@ class _VehicleLogHistoryScreenState
         Row(children: [
           _mileageChip('출발', '$before km', Colors.orange),
           const SizedBox(width: 8),
-          const Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.grey),
+          const Icon(Icons.arrow_forward_rounded,
+              size: 14, color: Colors.grey),
           const SizedBox(width: 8),
-          _mileageChip('도착',
+          _mileageChip(
+              '도착',
               after != null ? '$after km' : '미기록',
-              after != null ? const Color(0xFF2E6BFF) : Colors.grey),
+              after != null
+                  ? const Color(0xFF2E6BFF)
+                  : Colors.grey),
         ]),
       ]),
     );
@@ -457,36 +513,50 @@ class _VehicleLogHistoryScreenState
       decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(
-          color: color, fontSize: 11, fontWeight: FontWeight.w800)),
+      child: Text(label,
+          style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w800)),
     );
   }
 
-  Widget _iconRow(IconData icon, String text, {bool ellipsis = false}) {
+  Widget _iconRow(IconData icon, String text,
+      {bool ellipsis = false}) {
     return Row(children: [
       Icon(icon, size: 13, color: Colors.grey),
       const SizedBox(width: 4),
       ellipsis
-          ? Expanded(child: Text(text,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-              overflow: TextOverflow.ellipsis))
+          ? Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.grey),
+                  overflow: TextOverflow.ellipsis))
           : Text(text,
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              style:
+                  const TextStyle(fontSize: 12, color: Colors.grey)),
     ]);
   }
 
   Widget _mileageChip(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(
-            fontSize: 9, color: color.withOpacity(0.6),
-            fontWeight: FontWeight.w700)),
-        Text(value, style: TextStyle(
-            fontSize: 12, color: color, fontWeight: FontWeight.w800)),
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label,
+            style: TextStyle(
+                fontSize: 9,
+                color: color.withOpacity(0.6),
+                fontWeight: FontWeight.w700)),
+        Text(value,
+            style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w800)),
       ]),
     );
   }

@@ -27,25 +27,19 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   static const _text    = Color(0xFF1A1D2E);
   static const _sub     = Color(0xFF8A93B0);
 
-  // ──────────────────────────────────────────
-  // 부서 → 결재자 직책 매핑
-  // ──────────────────────────────────────────
-
-  /// 부서에 따른 step1 결재자 직책
   String _step1Position(String dept) {
     switch (dept) {
-      case 'MANAGEMENT': return '과장';    // 관리부: 과장
-      case 'PRODUCTION': return '차장';    // 생산관리부: 차장
-      default:           return '과장';    // 기본값
+      case 'MANAGEMENT': return '과장';
+      case 'PRODUCTION': return '차장';
+      default:           return '과장';
     }
   }
 
-  /// 부서에 따른 step2 최종 결재자 직책
   String _step2Position(String dept) {
     switch (dept) {
-      case 'MANAGEMENT': return '대표이사';  // 관리부: 대표이사
-      case 'PRODUCTION': return '이사';      // 생산관리부: 이사
-      default:           return '대표이사';  // 기본값
+      case 'MANAGEMENT': return '대표이사';
+      case 'PRODUCTION': return '이사';
+      default:           return '대표이사';
     }
   }
 
@@ -60,8 +54,11 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     if (user == null) return;
     try {
       final results = await Future.wait([
-        supabase.from('profiles').select('total_leave, used_leave').eq('id', user.id).single(),
-        supabase.from('leave_requests').select().eq('user_id', user.id).order('start_date', ascending: false),
+        supabase.from('profiles').select('total_leave, used_leave')
+            .eq('id', user.id).single(),
+        supabase.from('leave_requests').select()
+            .eq('user_id', user.id)
+            .order('start_date', ascending: false),
       ]);
       if (mounted) {
         final profile = results[0] as Map<String, dynamic>;
@@ -98,7 +95,6 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
     final user = supabase.auth.currentUser;
     if (user == null) return;
     try {
-      // 1) 내 프로필 조회
       final myProfile = await supabase
           .from('profiles')
           .select('full_name, dept_category')
@@ -107,14 +103,14 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       final fullName = (myProfile['full_name'] as String?) ?? '';
       final dept     = (myProfile['dept_category'] as String?) ?? '';
 
-      // 2) 부서에 맞는 결재자 직책 결정
       final step1Position = _step1Position(dept);
       final step2Position = _step2Position(dept);
 
-      // 3) step1, step2 결재자 동시 조회
       final approverResults = await Future.wait([
-        supabase.from('profiles').select('id, full_name').eq('position', step1Position).limit(1),
-        supabase.from('profiles').select('id, full_name').eq('position', step2Position).limit(1),
+        supabase.from('profiles').select('id, full_name')
+            .eq('position', step1Position).limit(1),
+        supabase.from('profiles').select('id, full_name')
+            .eq('position', step2Position).limit(1),
       ]);
 
       final step1List = approverResults[0] as List;
@@ -136,7 +132,6 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
         step2ApproverName = (a['full_name'] as String?) ?? step2Position;
       }
 
-      // 4) 휴가 신청 insert
       await supabase.from('leave_requests').insert({
         'user_id':             user.id,
         'full_name':           fullName,
@@ -187,25 +182,36 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   String _fmt(double v) =>
       v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
 
+  // ── 휴가 종류별 라벨 / 색상 / 아이콘 ──────────────
   String _typeLabel(String type) => switch (type) {
-    'HALF'   => context.tr(AppStrings.leaveHalf),
-    'PUBLIC' => context.tr(AppStrings.leavePublic),
-    'EVENT'  => context.tr(AppStrings.leaveSpecial),
-    _        => context.tr(AppStrings.leaveAnnual),
+    'HALF'     => context.tr(AppStrings.leaveHalf),
+    'PUBLIC'   => context.tr(AppStrings.leavePublic),
+    'EVENT'    => context.tr(AppStrings.leaveSpecial),
+    'TRAINING' => context.tr({'ko': '교육', 'en': 'Training',
+                               'vi': 'Dao tao', 'uz': "Ta'lim",
+                               'km': 'បណ្តុះបណ្តាល'}),
+    'SICK'     => context.tr({'ko': '병가', 'en': 'Sick Leave',
+                               'vi': 'Nghi benh', 'uz': 'Kasal ta\'til',
+                               'km': 'ច្ឈប់ជំងឺ'}),
+    _          => context.tr(AppStrings.leaveAnnual),
   };
 
   Color _typeColor(String type) => switch (type) {
-    'HALF'   => const Color(0xFFFF9500),
-    'PUBLIC' => const Color(0xFF7C5CDB),
-    'EVENT'  => const Color(0xFFFF4D64),
-    _        => _primary,
+    'HALF'     => const Color(0xFFFF9500),
+    'PUBLIC'   => const Color(0xFF7C5CDB),
+    'EVENT'    => const Color(0xFFFF4D64),
+    'TRAINING' => const Color(0xFF00897B),
+    'SICK'     => Colors.blue,
+    _          => _primary,
   };
 
   IconData _typeIcon(String type) => switch (type) {
-    'HALF'   => Icons.wb_sunny_rounded,
-    'PUBLIC' => Icons.account_balance_rounded,
-    'EVENT'  => Icons.favorite_rounded,
-    _        => Icons.calendar_month_rounded,
+    'HALF'     => Icons.wb_sunny_rounded,
+    'PUBLIC'   => Icons.account_balance_rounded,
+    'EVENT'    => Icons.favorite_rounded,
+    'TRAINING' => Icons.school_rounded,
+    'SICK'     => Icons.local_hospital_rounded,
+    _          => Icons.calendar_month_rounded,
   };
 
   bool _typeDeducts(String type) => type == 'ANNUAL' || type == 'HALF';
@@ -213,7 +219,8 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(color: _primary)));
+      return const Scaffold(
+          body: Center(child: CircularProgressIndicator(color: _primary)));
     }
 
     final remaining = _totalLeave - _usedLeave;
@@ -227,7 +234,8 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       backgroundColor: _bg,
       appBar: AppBar(
         title: Text(context.tr(AppStrings.leaveRequest),
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            style: const TextStyle(
+                fontWeight: FontWeight.w900, fontSize: 18)),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: _text,
@@ -252,19 +260,31 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
               const SizedBox(height: 28),
 
               if (pending.isNotEmpty) ...[
-                _sectionTitle("⏳ ${context.tr({'ko':'승인 대기 중','en':'Pending','vi':'Cho duyet','uz':'Kutilmoqda','km':'កំពុងរង់ចាំ'})}", Colors.orange),
+                _sectionTitle(
+                    "⏳ ${context.tr({'ko': '승인 대기 중', 'en': 'Pending',
+                                     'vi': 'Cho duyet', 'uz': 'Kutilmoqda',
+                                     'km': 'កំពុងរង់ចាំ'})}",
+                    Colors.orange),
                 const SizedBox(height: 10),
                 ...pending.map(_leaveCard),
                 const SizedBox(height: 24),
               ],
               if (approved.isNotEmpty) ...[
-                _sectionTitle("✅ ${context.tr({'ko':'승인된 휴가','en':'Approved','vi':'Da duyet','uz':'Tasdiqlandi','km':'បានអនុម័ត'})}", Colors.green),
+                _sectionTitle(
+                    "✅ ${context.tr({'ko': '승인된 휴가', 'en': 'Approved',
+                                     'vi': 'Da duyet', 'uz': 'Tasdiqlandi',
+                                     'km': 'បានអនុម័ត'})}",
+                    Colors.green),
                 const SizedBox(height: 10),
                 ...approved.map(_leaveCard),
                 const SizedBox(height: 24),
               ],
               if (rejected.isNotEmpty) ...[
-                _sectionTitle("❌ ${context.tr({'ko':'반려된 휴가','en':'Rejected','vi':'Da tu choi','uz':'Rad etildi','km':'បានបដិសេធ'})}", Colors.redAccent),
+                _sectionTitle(
+                    "❌ ${context.tr({'ko': '반려된 휴가', 'en': 'Rejected',
+                                     'vi': 'Da tu choi', 'uz': 'Rad etildi',
+                                     'km': 'បានបដិសេធ'})}",
+                    Colors.redAccent),
                 const SizedBox(height: 10),
                 ...rejected.map(_leaveCard),
               ],
@@ -273,9 +293,16 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
                   child: Padding(
                     padding: const EdgeInsets.only(top: 40),
                     child: Column(children: [
-                      Icon(Icons.event_busy_rounded, size: 48, color: Colors.grey.withOpacity(0.4)),
+                      Icon(Icons.event_busy_rounded,
+                          size: 48,
+                          color: Colors.grey.withOpacity(0.4)),
                       const SizedBox(height: 12),
-                      Text(context.tr({'ko':'신청한 휴가가 없습니다.','en':'No leave requests.','vi':'Chua co yeu cau nghi.','uz':'Hech qanday ta\'til so\'rovi yo\'q.','km':'គ្មានការស្នើសុំ휴가ទេ។'}),
+                      Text(
+                          context.tr({'ko': '신청한 휴가가 없습니다.',
+                                      'en': 'No leave requests.',
+                                      'vi': 'Chua co yeu cau nghi.',
+                                      'uz': "Hech qanday ta'til so'rovi yo'q.",
+                                      'km': 'គ្មានការស្នើសុំ휴가ទេ។'}),
                           style: const TextStyle(color: Colors.grey)),
                     ]),
                   ),
@@ -290,27 +317,28 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
   Widget _sectionTitle(String title, Color color) {
     return Row(children: [
       Container(width: 4, height: 18,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2))),
       const SizedBox(width: 8),
-      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: _text)),
+      Text(title,
+          style: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w900, color: _text)),
     ]);
   }
 
   Widget _leaveCard(Map<String, dynamic> item) {
     final status    = item['status']        as String? ?? '';
     final leaveType = item['leave_type']    as String? ?? 'ANNUAL';
-    // 본인 휴가 목록이므로 프로필 부서를 기준으로 fallback
     final dept      = (item['dept_category'] as String?)?.isNotEmpty == true
         ? item['dept_category'] as String
         : (widget.userProfile['dept_category'] as String? ?? '');
-    final days      = (item['leave_days']   as num?)?.toDouble() ?? 0;
-    final start     = item['start_date']    as String? ?? '';
-    final end       = item['end_date']      as String? ?? '';
-    final reason    = item['reason']        as String? ?? '';
-    final step1     = item['step1_status']  as String? ?? 'PENDING';
-    final step2     = item['step2_status']  as String? ?? 'WAITING';
+    final days  = (item['leave_days'] as num?)?.toDouble() ?? 0;
+    final start = item['start_date']   as String? ?? '';
+    final end   = item['end_date']     as String? ?? '';
+    final reason = item['reason']      as String? ?? '';
+    final step1  = item['step1_status'] as String? ?? 'PENDING';
+    final step2  = item['step2_status'] as String? ?? 'WAITING';
 
-    // step2_approver_name이 null이면 부서 기반 직책으로 표시
     final step1Name = (item['step1_approver_name'] as String?)?.isNotEmpty == true
         ? item['step1_approver_name'] as String
         : _step1Position(dept);
@@ -318,30 +346,42 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
         ? item['step2_approver_name'] as String
         : _step2Position(dept);
 
-    debugPrint('leaveCard dept=$dept step2Name=$step2Name');
-
     final Color statusColor;
     final String statusLabel;
 
     switch (status) {
       case 'APPROVED':
         statusColor = Colors.green;
-        statusLabel = context.tr({'ko':'승인완료','en':'Approved','vi':'Da duyet','uz':'Tasdiqlandi','km':'អនុម័តហើយ'});
+        statusLabel = context.tr({'ko': '승인완료', 'en': 'Approved',
+                                  'vi': 'Da duyet', 'uz': 'Tasdiqlandi',
+                                  'km': 'អនុម័តហើយ'});
         break;
       case 'REJECTED':
         statusColor = Colors.redAccent;
-        statusLabel = context.tr({'ko':'반려','en':'Rejected','vi':'Tu choi','uz':'Rad etildi','km':'បដិសេធ'});
+        statusLabel = context.tr({'ko': '반려', 'en': 'Rejected',
+                                  'vi': 'Tu choi', 'uz': 'Rad etildi',
+                                  'km': 'បដិសេធ'});
         break;
       case 'PENDING':
         if (step1 == 'PENDING') {
           statusColor = Colors.orange;
-          statusLabel = context.tr({'ko':'$step1Name 검토중','en':'$step1Name reviewing','vi':'$step1Name dang xem','uz':'$step1Name ko\'rib chiqmoqda','km':'$step1Name កំពុងពិនិត្យ'});
+          statusLabel = context.tr({'ko': '$step1Name 검토중',
+                                    'en': '$step1Name reviewing',
+                                    'vi': '$step1Name dang xem',
+                                    'uz': "$step1Name ko'rib chiqmoqda",
+                                    'km': '$step1Name កំពុងពិនិត្យ'});
         } else if (step1 == 'APPROVED' && step2 == 'PENDING') {
           statusColor = const Color(0xFF7C5CDB);
-          statusLabel = context.tr({'ko':'$step2Name 검토중','en':'$step2Name reviewing','vi':'$step2Name dang xem','uz':'$step2Name ko\'rib chiqmoqda','km':'$step2Name កំពុងពិនិត្យ'});
+          statusLabel = context.tr({'ko': '$step2Name 검토중',
+                                    'en': '$step2Name reviewing',
+                                    'vi': '$step2Name dang xem',
+                                    'uz': "$step2Name ko'rib chiqmoqda",
+                                    'km': '$step2Name កំពុងពិនិត្យ'});
         } else {
           statusColor = Colors.orange;
-          statusLabel = context.tr({'ko':'대기중','en':'Waiting','vi':'Cho','uz':'Kutilmoqda','km':'រង់ចាំ'});
+          statusLabel = context.tr({'ko': '대기중', 'en': 'Waiting',
+                                    'vi': 'Cho', 'uz': 'Kutilmoqda',
+                                    'km': 'រង់ចាំ'});
         }
         break;
       default:
@@ -358,9 +398,13 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       if (d.length < 10) return d;
       return '${d.substring(5, 7)}/${d.substring(8, 10)}';
     }
+
     final dateStr = start == end
         ? fmtDate(start)
         : '${fmtDate(start)} ~ ${fmtDate(end)}';
+
+    final dayUnit = context.tr(
+        {'ko': '일', 'en': 'd', 'vi': 'n', 'uz': 'k', 'km': 'ថ្ងៃ'});
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -368,86 +412,145 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3))],
         border: Border.all(color: statusColor.withOpacity(0.15)),
       ),
       child: Row(children: [
         Container(
           width: 44, height: 44,
-          decoration: BoxDecoration(color: typeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+              color: typeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12)),
           child: Icon(typeIcon, color: typeColor, size: 22),
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(color: typeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                child: Text(typeLabel, style: TextStyle(color: typeColor, fontSize: 11, fontWeight: FontWeight.w800)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                    color: typeColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text(typeLabel,
+                    style: TextStyle(
+                        color: typeColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
               ),
               if (!deducts) ...[
                 const SizedBox(width: 5),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(6)),
                   child: Text(
-                    context.tr({'ko':'연차 미차감','en':'No deduction','vi':'Khong tru phep','uz':'Chegirmaydi','km':'មិនកាត់휴가'}),
-                    style: const TextStyle(color: _sub, fontSize: 10, fontWeight: FontWeight.w700)),
+                    context.tr({'ko': '연차 미차감', 'en': 'No deduction',
+                                'vi': 'Khong tru phep',
+                                'uz': 'Chegirmaydi', 'km': 'មិនកាត់'}),
+                    style: const TextStyle(
+                        color: _sub,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700)),
                 ),
               ],
               const SizedBox(width: 6),
-              Text(dateStr, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _text)),
+              Text(dateStr,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: _text)),
             ]),
             const SizedBox(height: 4),
             Text(
               deducts
-                  ? "${_fmt(days)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}${reason.isNotEmpty ? '  ·  $reason' : ''}"
-                  : reason.isNotEmpty ? reason : "${_fmt(days)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}",
+                  ? "${_fmt(days)}$dayUnit${reason.isNotEmpty ? '  ·  $reason' : ''}"
+                  : reason.isNotEmpty
+                      ? reason
+                      : "${_fmt(days)}$dayUnit",
               style: const TextStyle(fontSize: 12, color: _sub),
             ),
           ]),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-          child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w800)),
+          decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10)),
+          child: Text(statusLabel,
+              style: TextStyle(
+                  color: statusColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800)),
         ),
       ]),
     );
   }
 
   Widget _leaveSummaryCard(double remaining, double ratio) {
+    final dayUnit = context.tr(
+        {'ko': '일', 'en': 'd', 'vi': 'n', 'uz': 'k', 'km': 'ថ្ងៃ'});
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1E293B), Color(0xFF334155)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: const Color(0xFF1E293B).withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(
+            color: const Color(0xFF1E293B).withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 8))],
       ),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _statUnit(context.tr({'ko':'전체 연차','en':'Total','vi':'Tong','uz':'Jami','km':'សរុប'}), "${_fmt(_totalLeave)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}"),
+          _statUnit(
+              context.tr({'ko': '전체 연차', 'en': 'Total', 'vi': 'Tong',
+                          'uz': 'Jami', 'km': 'សរុប'}),
+              "${_fmt(_totalLeave)}$dayUnit"),
           Container(width: 1, height: 32, color: Colors.white12),
-          _statUnit(context.tr({'ko':'사용 연차','en':'Used','vi':'Da dung','uz':'Ishlatilgan','km':'បានប្រើ'}), "${_fmt(_usedLeave)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}"),
+          _statUnit(
+              context.tr({'ko': '사용 연차', 'en': 'Used', 'vi': 'Da dung',
+                          'uz': 'Ishlatilgan', 'km': 'បានប្រើ'}),
+              "${_fmt(_usedLeave)}$dayUnit"),
           Container(width: 1, height: 32, color: Colors.white12),
-          _statUnit(context.tr({'ko':'잔여 연차','en':'Left','vi':'Con lai','uz':'Qolgan','km':'នៅសល់'}), "${_fmt(remaining)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}", highlight: remaining <= 3),
+          _statUnit(
+              context.tr({'ko': '잔여 연차', 'en': 'Left', 'vi': 'Con lai',
+                          'uz': 'Qolgan', 'km': 'នៅសល់'}),
+              "${_fmt(remaining)}$dayUnit",
+              highlight: remaining <= 3),
         ]),
         const SizedBox(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text("${context.tr({'ko':'사용률','en':'Usage','vi':'Ti le','uz':'Foydalanish','km':'ការប្រើប្រាស់'})} ${(ratio * 100).toStringAsFixed(0)}%",
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w600)),
-          Text("${_fmt(_usedLeave)} / ${_fmt(_totalLeave)}${context.tr({'ko':'일','en':'d','vi':'n','uz':'k','km':'ថ្ងៃ'})}",
-              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(
+              "${context.tr({'ko': '사용률', 'en': 'Usage', 'vi': 'Ti le',
+                             'uz': 'Foydalanish', 'km': 'ការប្រើប្រាស់'})} "
+              "${(ratio * 100).toStringAsFixed(0)}%",
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
+          Text("${_fmt(_usedLeave)} / ${_fmt(_totalLeave)}$dayUnit",
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600)),
         ]),
         const SizedBox(height: 6),
         ClipRRect(
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
-            value: ratio.clamp(0.0, 1.0), minHeight: 5,
+            value: ratio.clamp(0.0, 1.0),
+            minHeight: 5,
             backgroundColor: Colors.white.withOpacity(0.1),
             valueColor: AlwaysStoppedAnimation<Color>(
                 ratio > 0.8 ? const Color(0xFFFF4D64) : _success),
@@ -459,11 +562,17 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
 
   Widget _statUnit(String label, String value, {bool highlight = false}) {
     return Column(children: [
-      Text(label, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11, fontWeight: FontWeight.w600)),
+      Text(label,
+          style: TextStyle(
+              color: Colors.white.withOpacity(0.5),
+              fontSize: 11,
+              fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
-      Text(value, style: TextStyle(
-          color: highlight ? const Color(0xFFFF4D64) : Colors.white,
-          fontSize: 24, fontWeight: FontWeight.w900)),
+      Text(value,
+          style: TextStyle(
+              color: highlight ? const Color(0xFFFF4D64) : Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900)),
     ]);
   }
 
@@ -476,17 +585,24 @@ class _LeaveRequestScreenState extends State<LeaveRequestScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _primary.withOpacity(0.15)),
-          boxShadow: [BoxShadow(color: _primary.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(
+              color: _primary.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4))],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.edit_calendar_rounded, color: _primary, size: 20),
-            const SizedBox(width: 10),
-            Text(context.tr({'ko':'휴가 신청하기','en':'Request Leave','vi':'Dang ky nghi','uz':'Ta\'til so\'rash','km':'ស្នើសុំ휴가'}),
-                style: const TextStyle(color: _primary, fontWeight: FontWeight.w800, fontSize: 15)),
-          ],
-        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.edit_calendar_rounded,
+              color: _primary, size: 20),
+          const SizedBox(width: 10),
+          Text(
+              context.tr({'ko': '휴가 신청하기', 'en': 'Request Leave',
+                          'vi': 'Dang ky nghi', 'uz': "Ta'til so'rash",
+                          'km': 'ស្នើសុំ휴가'}),
+              style: const TextStyle(
+                  color: _primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15)),
+        ]),
       ),
     );
   }

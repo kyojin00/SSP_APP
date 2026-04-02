@@ -59,6 +59,25 @@ class _VehicleScreenState extends State<VehicleScreen>
   static const _primary = Color(0xFF2E6BFF);
   static const _bg      = Color(0xFFF0F2F7);
 
+  // ── 부서별 접근 권한
+  String get _dept =>
+      widget.userProfile['dept_category'] as String? ?? '';
+
+  /// 납품차량(트럭)만 볼 수 있는 부서
+  bool get _onlyDelivery => _dept == 'DELIVERY';
+
+  /// 납품차량 + 사무차량 둘 다 볼 수 있는 부서
+  bool get _showBoth =>
+      widget.isAdmin || ['PRODUCTION', 'SALES', 'MANAGEMENT'].contains(_dept);
+
+  /// 접근 가능 여부
+  bool get _hasAccess => widget.isAdmin || _onlyDelivery || _showBoth;
+
+  int get _tabCount {
+    if (_showBoth) return 2;
+    return 1;
+  }
+
   List<_Vehicle> get _deliveryVehicles =>
       _vehicles.where((v) => v.vehicleType == 'DELIVERY').toList();
   List<_Vehicle> get _officeVehicles =>
@@ -67,7 +86,7 @@ class _VehicleScreenState extends State<VehicleScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: _tabCount, vsync: this);
     _loadData();
   }
 
@@ -128,6 +147,27 @@ class _VehicleScreenState extends State<VehicleScreen>
     final delivery = _deliveryVehicles;
     final office   = _officeVehicles;
 
+    late final List<Tab> tabs;
+    late final List<Widget> tabViews;
+
+    if (_showBoth) {
+      tabs = [
+        Tab(text: '납품차량 (${delivery.length})'),
+        Tab(text: '사무차량 (${office.length})'),
+      ];
+      tabViews = [
+        _vehicleListTab(delivery),
+        _vehicleListTab(office),
+      ];
+    } else if (_onlyDelivery) {
+      tabs = [Tab(text: '납품차량 (${delivery.length})')];
+      tabViews = [_vehicleListTab(delivery)];
+    } else {
+      // 접근 불가 — 빈 탭 (body에서 처리)
+      tabs = [const Tab(text: '-')];
+      tabViews = [const SizedBox.shrink()];
+    }
+
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -138,26 +178,26 @@ class _VehicleScreenState extends State<VehicleScreen>
         foregroundColor: const Color(0xFF1A1D2E),
         elevation: 0,
         surfaceTintColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabCtrl,
-          labelColor: _primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: _primary,
-          indicatorWeight: 3,
-          dividerColor: Colors.transparent,
-          tabs: [
-            Tab(text: '납품차량 (${delivery.length})'),
-            Tab(text: '사무차량 (${office.length})'),
-          ],
-        ),
+        bottom: _hasAccess
+            ? TabBar(
+                controller: _tabCtrl,
+                labelColor: _primary,
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: _primary,
+                indicatorWeight: 3,
+                dividerColor: Colors.transparent,
+                tabs: tabs,
+              )
+            : null,
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) =>
-                    VehicleStatsScreen(vehicles: _vehicles))),
-            icon: const Icon(Icons.bar_chart_rounded),
-            tooltip: '주행 통계',
-          ),
+          if (widget.isAdmin)
+            IconButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) =>
+                      VehicleStatsScreen(vehicles: _vehicles))),
+              icon: const Icon(Icons.bar_chart_rounded),
+              tooltip: '주행 통계',
+            ),
           IconButton(
             onPressed: _loadData,
             icon: const Icon(Icons.refresh_rounded),
@@ -166,13 +206,26 @@ class _VehicleScreenState extends State<VehicleScreen>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _primary))
-          : TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _vehicleListTab(delivery),
-                _vehicleListTab(office),
-              ],
-            ),
+          : !_hasAccess
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.lock_outline_rounded,
+                          size: 52, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text('접근 권한이 없습니다.',
+                          style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                )
+              : TabBarView(
+                  controller: _tabCtrl,
+                  children: tabViews,
+                ),
     );
   }
 
@@ -186,7 +239,6 @@ class _VehicleScreenState extends State<VehicleScreen>
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         children: [
-          // 해당 탭 요약
           Row(children: [
             Expanded(child: _summaryChip(
                 Icons.check_circle_rounded, Colors.green, '사용 가능', '$available대')),
@@ -244,7 +296,6 @@ class _VehicleScreenState extends State<VehicleScreen>
     );
   }
 
-  // ── 차량 카드 ──
   Widget _vehicleCard(_Vehicle v) {
     final isDriving   = v.currentLog != null;
     final myId        = supabase.auth.currentUser?.id;
@@ -314,7 +365,6 @@ class _VehicleScreenState extends State<VehicleScreen>
             ),
           ]),
 
-          // 운행 중 정보
           if (isDriving) ...[
             const SizedBox(height: 12),
             Container(
@@ -349,7 +399,6 @@ class _VehicleScreenState extends State<VehicleScreen>
             ),
           ],
 
-          // 버튼
           const SizedBox(height: 12),
           if (!isDriving)
             _actionBtn('출발 기록', Icons.play_arrow_rounded, Colors.green,
@@ -391,7 +440,6 @@ class _VehicleScreenState extends State<VehicleScreen>
     );
   }
 
-  // ── 출발 기록 ──
   void _showDepartureSheet(_Vehicle v) {
     showModalBottomSheet(
       context: context,
@@ -432,7 +480,6 @@ class _VehicleScreenState extends State<VehicleScreen>
     }
   }
 
-  // ── 귀환 기록 ──
   void _showReturnSheet(_Vehicle v) {
     showModalBottomSheet(
       context: context,
@@ -448,7 +495,7 @@ class _VehicleScreenState extends State<VehicleScreen>
 
   Future<void> _submitReturn(_Vehicle v, int mileageAfter) async {
     try {
-      final logId       = v.currentLog!['id'] as String;
+      final logId         = v.currentLog!['id'] as String;
       final mileageBefore = v.currentLog!['mileage_before'] as int;
       await supabase.from('vehicle_logs').update({
         'mileage_after': mileageAfter,

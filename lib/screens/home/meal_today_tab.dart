@@ -29,6 +29,17 @@ class _MealTodayTabState extends State<MealTodayTab> {
 
   List<Map<String, dynamic>> _guests = [];
 
+  // ── 영양사 제외 필터
+  static const _excludedFromMeal = {'NUTRITION'};
+
+  List<Map<String, dynamic>> get _filteredProfiles => widget.allProfiles
+      .where((p) => !_excludedFromMeal.contains(p['dept_category'])).toList();
+
+  List<String> get _filteredDepts => widget.depts
+      .where((d) => !_excludedFromMeal.contains(d)).toList();
+
+  int get _filteredTotalMembers => _filteredProfiles.length;
+
   @override
   void initState() {
     super.initState();
@@ -301,7 +312,7 @@ class _MealTodayTabState extends State<MealTodayTab> {
     final deptRows = allRows.where((r) => r['dept_category'] == dept).toList();
     final eating   = deptRows.where((r) => r['is_eating'] == true).toList();
     final notEating= deptRows.where((r) => r['is_eating'] == false).toList();
-    final deptProfiles = widget.allProfiles
+    final deptProfiles = _filteredProfiles
         .where((p) => p['dept_category'] == dept).toList();
     final repliedIds = deptRows.map((r) => r['user_id'] as String).toSet();
     final noReply  = deptProfiles
@@ -439,6 +450,7 @@ class _MealTodayTabState extends State<MealTodayTab> {
       ]),
     );
   }
+
   Widget _tapBox(
     BuildContext context, {
     required String label,
@@ -464,7 +476,6 @@ class _MealTodayTabState extends State<MealTodayTab> {
           child: Column(children: [
             Text(value, style: TextStyle(
                 fontSize: 22, fontWeight: FontWeight.w900, color: color)),
-            // 손님 표시
             if (guestCount > 0) ...[
               const SizedBox(height: 1),
               Row(mainAxisSize: MainAxisSize.min, children: [
@@ -476,7 +487,6 @@ class _MealTodayTabState extends State<MealTodayTab> {
                     color: color.withOpacity(0.7))),
               ]),
             ],
-            // 국적 분포 (손님 유무 관계없이 항상 표시)
             if (nationalitySub != null && nationalitySub.isNotEmpty) ...[
               const SizedBox(height: 1),
               Text(nationalitySub, style: TextStyle(
@@ -505,8 +515,10 @@ class _MealTodayTabState extends State<MealTodayTab> {
       stream: stream,
       builder: (context, snap) {
         final raw        = snap.data ?? [];
+        // ── 영양사(NUTRITION) 및 기존 excludedDepts 모두 제외
         final todayAll   = raw.where((r) =>
-            !mrExcludedDepts.contains(r['dept_category'])).toList();
+            !mrExcludedDepts.contains(r['dept_category']) &&
+            !_excludedFromMeal.contains(r['dept_category'])).toList();
         final lunchRows  = todayAll.where((r) => r['meal_type'] == 'LUNCH').toList();
         final dinnerRows = todayAll.where((r) => r['meal_type'] == 'DINNER').toList();
 
@@ -516,26 +528,24 @@ class _MealTodayTabState extends State<MealTodayTab> {
         final dinnerGuests = _guests.where((g) => g['meal_type'] == 'DINNER')
             .fold(0, (s, g) => s + ((g['guest_count'] as int?) ?? 0));
 
-        // ── 전체 통계 (손님 포함)
+        // ── 전체 통계 (영양사 제외된 _filteredTotalMembers 사용)
         MealStat makeTotalStat(List<Map<String, dynamic>> rows, int guests) {
           final e = rows.where((r) => r['is_eating'] == true).length + guests;
           final n = rows.where((r) => r['is_eating'] == false).length;
           return MealStat(eating: e, notEating: n,
-              noReply: (widget.totalMembers - rows.where((r) =>
+              noReply: (_filteredTotalMembers - rows.where((r) =>
                   r['is_eating'] == true).length - n).clamp(0, 99999),
-              members: widget.totalMembers);
+              members: _filteredTotalMembers);
         }
 
-        // ── 명단 추출 헬퍼
         // profiles nationality 맵 생성
         final nationalityMap = <String, String>{};
-        for (final p in widget.allProfiles) {
+        for (final p in _filteredProfiles) {
           final uid = p['id'] as String? ?? '';
           final nat = p['nationality'] as String? ?? '';
           if (nat.isNotEmpty) nationalityMap[uid] = nat;
         }
 
-        // meal_requests row에 nationality 주입
         List<Map<String, dynamic>> withNationality(
             List<Map<String, dynamic>> rows) {
           return rows.map((r) {
@@ -550,17 +560,18 @@ class _MealTodayTabState extends State<MealTodayTab> {
         List<Map<String, dynamic>> notEating(List<Map<String, dynamic>> rows) =>
             withNationality(rows.where((r) => r['is_eating'] == false).toList());
 
+        // ── 미응답: 영양사 제외된 _filteredProfiles 기준
         List<Map<String, dynamic>> noReply(List<Map<String, dynamic>> rows) {
           final repliedIds = rows.map((r) => r['user_id'] as String).toSet();
-          return widget.allProfiles
+          return _filteredProfiles
               .where((p) => !repliedIds.contains(p['id'] as String))
               .toList();
         }
 
-        // ── 부서별 통계
+        // ── 부서별 통계: 영양사 제외된 _filteredDepts 사용
         List<DeptMealStat> makeDeptStats(List<Map<String, dynamic>> rows) {
-          return widget.depts.map((dept) {
-            final members = widget.allProfiles
+          return _filteredDepts.map((dept) {
+            final members = _filteredProfiles
                 .where((p) => p['dept_category'] == dept).length;
             final dr = rows.where((r) => r['dept_category'] == dept).toList();
             final e  = dr.where((r) => r['is_eating'] == true).length;
@@ -704,7 +715,6 @@ class _MealTodayTabState extends State<MealTodayTab> {
         : 0.0;
     final rc = mrRateColor(rate);
 
-    // 국적별 카운트 헬퍼 (손님 포함)
     String _natSub(List<Map<String, dynamic>> list, {int guests = 0}) {
       if (list.isEmpty && guests == 0) return '';
       final totalCount = list.length + guests;
@@ -715,7 +725,6 @@ class _MealTodayTabState extends State<MealTodayTab> {
           natCount[nat] = (natCount[nat] ?? 0) + 1;
         }
       }
-      // 손님은 별도 카운트
       if (guests > 0) natCount['손님'] = guests;
       if (natCount.isEmpty) return '';
       final foreignTotal = natCount.values.fold(0, (a, b) => a + b);
@@ -762,7 +771,7 @@ class _MealTodayTabState extends State<MealTodayTab> {
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Row(children: [
             _tapBox(context,
-              label: '식사', 
+              label: '식사',
               value: guestCount > 0
                   ? '${total.eating - guestCount}+$guestCount'
                   : '${total.eating}',

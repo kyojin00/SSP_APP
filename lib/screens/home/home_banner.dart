@@ -9,6 +9,7 @@ class _StatusBanner extends StatelessWidget {
   final bool lunchChecked;
   final bool dinnerChecked;
   final bool attendanceChecked;
+  final bool isNutrition;       // ← 영양사 여부
   final VoidCallback onNoticeTap;
   final VoidCallback onMealTap;
   final VoidCallback onAttendanceTap;
@@ -21,10 +22,14 @@ class _StatusBanner extends StatelessWidget {
     required this.onNoticeTap,
     required this.onMealTap,
     required this.onAttendanceTap,
+    this.isNutrition = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // 영양사는 배너 전체 숨김
+    if (isNutrition) return const SizedBox.shrink();
+
     final hasUnreadNotice = unreadNoticeCount > 0;
     final mealUnchecked   = !lunchChecked || !dinnerChecked;
     final noAttendance    = !attendanceChecked;
