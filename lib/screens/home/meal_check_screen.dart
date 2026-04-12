@@ -21,17 +21,17 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
   final supabase = Supabase.instance.client;
 
   bool? _isEating;
-  bool _isSubmitting = false;
+  bool _isSubmitting   = false;
   bool _alreadySubmitted = false;
-  bool _isLoading = true;
+  bool _isLoading      = true;
 
-  // 손님 관련
-  int  _guestCount       = 0;
-  bool _showGuestInput   = false;
-  bool _guestSubmitting  = false;
-  int  _existingGuests   = 0; // 이미 등록된 손님 수
-  String? _guestId;           // 기존 meal_guests row id
+  int    _guestCount      = 0;
+  bool   _showGuestInput  = false;
+  bool   _guestSubmitting = false;
+  int    _existingGuests  = 0;
+  String? _guestId;
 
+  // ── 헬퍼
   String get _today {
     final now = DateTime.now();
     if (now.hour >= 18) {
@@ -42,13 +42,13 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
   }
 
   DateTime get _deadline {
-    final now = DateTime.now();
+    final now  = DateTime.now();
     final base = now.hour >= 18
         ? DateTime(now.year, now.month, now.day + 1)
         : DateTime(now.year, now.month, now.day);
     return widget.mealType == 'DINNER'
-        ? DateTime(base.year, base.month, base.day, 13, 30) // ← 13:30
-        : DateTime(base.year, base.month, base.day,  9,  0); // ← 09:00
+        ? DateTime(base.year, base.month, base.day, 13, 30)
+        : DateTime(base.year, base.month, base.day,  9,  0);
   }
 
   bool get _isLocked => DateTime.now().isAfter(_deadline);
@@ -63,11 +63,17 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
 
   String _mealLabel(BuildContext ctx) =>
       widget.mealType == 'DINNER' ? ctx.tr(AppStrings.dinnerShort) : ctx.tr(AppStrings.lunchShort);
+
   IconData get _mealIcon =>
       widget.mealType == 'DINNER' ? Icons.dinner_dining : Icons.lunch_dining;
-  Color get _themeColor =>
-      widget.mealType == 'DINNER' ? Colors.indigo : Colors.orange;
 
+  Color get _themeColor =>
+      widget.mealType == 'DINNER' ? const Color(0xFF3949AB) : const Color(0xFFFF7A2F);
+
+  Color get _themeLighter =>
+      widget.mealType == 'DINNER' ? const Color(0xFF6573C3) : const Color(0xFFFFAA6B);
+
+  // ── Lifecycle
   @override
   void initState() {
     super.initState();
@@ -86,16 +92,13 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
             .eq('registered_by', user.id).eq('meal_date', _today)
             .eq('meal_type', widget.mealType).maybeSingle(),
       ]);
-
       if (!mounted) return;
       final mealData  = results[0] as Map<String, dynamic>?;
       final guestData = results[1] as Map<String, dynamic>?;
-
       setState(() {
         if (mealData != null) {
           _alreadySubmitted = true;
           _isEating = mealData['is_eating'] as bool?;
-          // 먹어요면 손님 입력 영역 표시
           if (_isEating == true) _showGuestInput = true;
         }
         if (guestData != null) {
@@ -114,104 +117,88 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
   Future<void> _submitMealRequest(bool eating) async {
     if (_isLocked) return;
     if (_alreadySubmitted && _isEating == eating) return;
-
     setState(() => _isSubmitting = true);
     final user = supabase.auth.currentUser;
-
     try {
       if (user == null) throw Exception("로그인 정보 없음");
       final wasChange = _alreadySubmitted;
-
       if (_alreadySubmitted) {
         await supabase.from('meal_requests').update({'is_eating': eating})
             .eq('user_id', user.id).eq('meal_date', _today)
             .eq('meal_type', widget.mealType);
       } else {
         await supabase.from('meal_requests').insert({
-          'user_id':      user.id,
-          'full_name':    widget.userProfile['full_name'],
-          'dept_category':widget.userProfile['dept_category'],
-          'meal_date':    _today,
-          'meal_type':    widget.mealType,
-          'is_eating':    eating,
+          'user_id':       user.id,
+          'full_name':     widget.userProfile['full_name'],
+          'dept_category': widget.userProfile['dept_category'],
+          'meal_date':     _today,
+          'meal_type':     widget.mealType,
+          'is_eating':     eating,
         });
       }
-
       if (!mounted) return;
       final label = _mealLabel(context);
       setState(() {
         _alreadySubmitted = true;
         _isEating         = eating;
-        _showGuestInput   = eating; // 먹어요일 때만 손님 입력 표시
-        if (!eating) {
-          // 불참으로 변경 시 기존 손님 삭제
-          _removeGuest();
-        }
+        _showGuestInput   = eating;
+        if (!eating) _removeGuest();
       });
-
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(eating
-            ? (wasChange ? '오늘 $label 식사로 변경되었습니다. 🍚' : '오늘 $label 식사가 신청되었습니다. 🍚')
-            : (wasChange ? '오늘 $label 미식사로 변경되었습니다. 🚫' : '오늘 $label 미식사로 접수되었습니다. 🚫')),
+        content: Text(
+          eating
+              ? (wasChange ? '$label 식사로 변경됐어요 ✅' : '$label 식사 신청됐어요 🍽️')
+              : (wasChange ? '$label 미신청으로 변경됐어요' : '$label 미신청으로 등록됐어요'),
+        ),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: eating ? _themeColor : Colors.blueGrey,
         duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ));
-
-      // 먹어요가 아니면 바로 닫기
-      if (!eating) {
-        await Future.delayed(const Duration(milliseconds: 1500));
-        if (mounted) Navigator.pop(context);
-      }
-    } on PostgrestException catch (e) {
-      if (e.code == '23505') {
-        if (!mounted) return;
-        setState(() => _alreadySubmitted = true);
-        _showErrorSnackBar('이미 오늘 ${_mealLabel(context)} 체크를 완료했습니다.');
-        Navigator.pop(context);
-      }
     } catch (e) {
-      _showErrorSnackBar('저장에 실패했습니다. 다시 시도해주세요.');
+      if (!mounted) return;
+      _showErrorSnackBar("오류 발생: $e");
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  // 손님 저장/수정
   Future<void> _saveGuest() async {
-    if (_isLocked || _guestCount == _existingGuests) return;
+    if (_guestSubmitting) return;
+    setState(() => _guestSubmitting = true);
     final user = supabase.auth.currentUser;
     if (user == null) return;
-
-    setState(() => _guestSubmitting = true);
     try {
       if (_guestCount == 0) {
         await _removeGuest();
       } else if (_guestId != null) {
-        // 수정
         await supabase.from('meal_guests')
             .update({'guest_count': _guestCount}).eq('id', _guestId!);
+        setState(() => _existingGuests = _guestCount);
       } else {
-        // 신규
         final res = await supabase.from('meal_guests').insert({
           'registered_by': user.id,
-          'dept_category': widget.userProfile['dept_category'],
           'meal_date':     _today,
           'meal_type':     widget.mealType,
           'guest_count':   _guestCount,
         }).select().single();
-        _guestId = res['id'] as String?;
+        setState(() {
+          _guestId        = res['id'] as String?;
+          _existingGuests = _guestCount;
+        });
       }
-      setState(() => _existingGuests = _guestCount);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(_guestCount > 0
-              ? '손님 $_guestCount명 등록됐어요 👥'
-              : '손님 정보가 삭제됐어요'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_guestCount > 0
+            ? '손님 $_guestCount명 등록됐어요 👥'
+            : '손님 정보가 삭제됐어요'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ));
     } catch (e) {
       debugPrint('손님 저장 실패: $e');
     } finally {
@@ -234,182 +221,336 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
   }
 
   void _showErrorSnackBar(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.redAccent));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: Colors.redAccent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+    ));
   }
+
+  // ══════════════════════════════════════════
+  // Build
+  // ══════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Scaffold(
-        body: Center(child: CircularProgressIndicator()));
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF4F6FB),
+        body: Center(
+          child: CircularProgressIndicator(color: _themeColor),
+        ),
+      );
+    }
 
     final label  = _mealLabel(context);
     final locked = _isLocked;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FB),
-      appBar: AppBar(
-        title: Text('$label 식수 체크',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true, elevation: 0,
-        backgroundColor: Colors.white, foregroundColor: Colors.black,
-      ),
-      body: Column(children: [
-        // ── 상단 헤더
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-          decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(bottom: Radius.circular(30))),
-          child: Column(children: [
-            Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                  color: locked
-                      ? Colors.red.withOpacity(0.07)
-                      : Colors.green.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                      color: locked
-                          ? Colors.red.withOpacity(0.3)
-                          : Colors.green.withOpacity(0.3))),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(locked ? Icons.lock_rounded : Icons.timer_rounded,
-                    size: 13, color: locked ? Colors.red : Colors.green),
-                const SizedBox(width: 5),
-                Text(
-                  locked
-                      ? (widget.mealType == 'LUNCH'
-                          ? '점심 마감 (09:00 이후)' : '저녁 마감 (13:30 이후)') // ← 수정
-                      : _remainingLabel(context),
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                      color: locked ? Colors.red : Colors.green),
+      backgroundColor: const Color(0xFFF4F6FB),
+      body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // ── 그라디언트 헤더
+          SliverAppBar(
+            expandedHeight: 200,
+            pinned: true,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: _themeColor,
+            foregroundColor: Colors.white,
+            title: Text(
+              '$label 식수 체크',
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 17,
+                color: Colors.white,
+              ),
+            ),
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_themeLighter, _themeColor],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
-              ]),
+                child: Stack(children: [
+                  // 배경 장식 원
+                  Positioned(
+                    right: -40, top: -40,
+                    child: Container(
+                      width: 200, height: 200,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: -20, bottom: -30,
+                    child: Container(
+                      width: 140, height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.06),
+                      ),
+                    ),
+                  ),
+                  // 본문
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 90, 22, 0),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // 아이콘 원
+                        Container(
+                          width: 64, height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.22),
+                            border: Border.all(
+                                color: Colors.white.withOpacity(0.4),
+                                width: 2),
+                          ),
+                          child: Icon(_mealIcon,
+                              color: Colors.white, size: 30),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _alreadySubmitted
+                                    ? (_isEating == true ? '✅ 식사 신청 완료' : '⛔ 미신청 완료')
+                                    : '오늘 $label 어떻게 하시겠어요?',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              // 마감 뱃지
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: locked
+                                      ? Colors.red.withOpacity(0.3)
+                                      : Colors.white.withOpacity(0.22),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: Colors.white.withOpacity(0.35)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      locked
+                                          ? Icons.lock_rounded
+                                          : Icons.timer_rounded,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      locked
+                                          ? (widget.mealType == 'LUNCH'
+                                              ? '점심 마감 (09:00 이후)'
+                                              : '저녁 마감 (13:30 이후)')
+                                          : _remainingLabel(context),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
             ),
-            Icon(_mealIcon, size: 56,
-                color: locked ? Colors.grey[400] : _themeColor),
-            const SizedBox(height: 14),
-            Text("$_today ($label)",
-                style: const TextStyle(fontSize: 15, color: Colors.grey,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Text(
-              locked && !_alreadySubmitted
-                  ? '마감 시간이 지나 신청할 수 없습니다.'
-                  : locked && _alreadySubmitted
-                      ? '식수 체크 완료 (마감)'
-                      : !_alreadySubmitted
-                          ? '오늘 $label 식사를 하시겠습니까?'
-                          : '변경 가능합니다 (마감 전)',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                  color: (locked && !_alreadySubmitted) ? Colors.grey : Colors.black87),
-            ),
-          ]),
-        ),
+          ),
 
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(children: [
-              // ── 먹어요 / 안먹어요
-              Row(children: [
-                Expanded(child: _buildChoiceCard(
-                  title: '먹어요', subtitle: '식사 신청',
-                  icon: Icons.restaurant, color: Colors.orange,
-                  isSelected: _isEating == true, disabled: locked,
-                  onTap: () => _submitMealRequest(true),
-                )),
-                const SizedBox(width: 16),
-                Expanded(child: _buildChoiceCard(
-                  title: '안 먹어요', subtitle: '미신청',
-                  icon: Icons.no_meals, color: Colors.blueGrey,
-                  isSelected: _isEating == false, disabled: locked,
-                  onTap: () => _submitMealRequest(false),
-                )),
-              ]),
+          // ── 본문
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 20, 18, 48),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
 
-              // ── 손님 추가 (먹어요 선택 + 마감 전)
-              if (_showGuestInput && !locked) ...[
-                const SizedBox(height: 20),
-                _buildGuestSection(),
-              ],
+                // ── 선택 카드 2개
+                Row(children: [
+                  Expanded(
+                    child: _ChoiceCard(
+                      title:      '먹어요',
+                      subtitle:   '식사 신청',
+                      icon:       Icons.restaurant_rounded,
+                      color:      _themeColor,
+                      lighter:    _themeLighter,
+                      isSelected: _isEating == true,
+                      disabled:   locked,
+                      onTap:      () => _submitMealRequest(true),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _ChoiceCard(
+                      title:      '안 먹어요',
+                      subtitle:   '미신청',
+                      icon:       Icons.no_meals_rounded,
+                      color:      const Color(0xFF607D8B),
+                      lighter:    const Color(0xFF8FA8B4),
+                      isSelected: _isEating == false,
+                      disabled:   locked,
+                      onTap:      () => _submitMealRequest(false),
+                    ),
+                  ),
+                ]),
 
-              // ── 기존 손님 표시 (마감 후)
-              if (_showGuestInput && locked && _existingGuests > 0) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.06),
+                // ── 손님 추가 (먹어요 + 마감 전)
+                if (_showGuestInput && !locked) ...[
+                  const SizedBox(height: 16),
+                  _buildGuestSection(),
+                ],
+
+                // ── 마감 후 손님 표시
+                if (_showGuestInput && locked && _existingGuests > 0) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _themeColor.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: Colors.orange.withOpacity(0.2))),
-                  child: Row(children: [
-                    const Icon(Icons.people_rounded,
-                        size: 18, color: Colors.orange),
-                    const SizedBox(width: 8),
-                    Text('손님 $_existingGuests명 등록됨',
-                        style: const TextStyle(fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.orange)),
-                  ]),
-                ),
-              ],
+                          color: _themeColor.withOpacity(0.2)),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.people_rounded,
+                          size: 18, color: _themeColor),
+                      const SizedBox(width: 8),
+                      Text('손님 $_existingGuests명 등록됨',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _themeColor)),
+                    ]),
+                  ),
+                ],
 
-              const SizedBox(height: 20),
-
-              if (!locked && _alreadySubmitted)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
+                // ── 변경 가능 안내
+                if (!locked && _alreadySubmitted) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
                       color: Colors.blue.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: Colors.blue.withOpacity(0.2))),
-                  child: Row(children: [
-                    const Icon(Icons.swap_horiz_rounded,
-                        size: 16, color: Colors.blue),
-                    const SizedBox(width: 8),
-                    const Expanded(child: Text('다른 항목을 누르면 변경됩니다.',
-                        style: TextStyle(fontSize: 12,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600))),
-                  ]),
-                ),
+                          color: Colors.blue.withOpacity(0.18)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.swap_horiz_rounded,
+                          size: 16, color: Colors.blue),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          '다른 항목을 누르면 변경됩니다.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
 
-              if (locked && _alreadySubmitted) ...[
-                const SizedBox(height: 8),
-                const Text('※ 변경이 필요한 경우 관리자에게 문의하세요.',
-                    style: TextStyle(color: Colors.black38, fontSize: 13),
-                    textAlign: TextAlign.center),
-              ],
+                // ── 마감 + 미신청 안내
+                if (locked && !_alreadySubmitted) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    '마감 시간이 지나 신청할 수 없습니다.',
+                    style: TextStyle(
+                        color: Colors.black38,
+                        fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
 
-              if (_alreadySubmitted || locked) ...[
-                const SizedBox(height: 12),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('홈으로 돌아가기',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
+                // ── 마감 후 변경 안내
+                if (locked && _alreadySubmitted) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Text(
+                      '※ 변경이 필요한 경우 관리자에게 문의하세요.',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.black45),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
 
-              if (_isSubmitting)
-                const Padding(padding: EdgeInsets.only(top: 24),
-                    child: CircularProgressIndicator()),
-            ]),
+                // ── 홈으로 버튼
+                if (_alreadySubmitted || locked) ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
+                        backgroundColor:
+                            Colors.black.withOpacity(0.05),
+                      ),
+                      child: const Text('홈으로 돌아가기',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black54)),
+                    ),
+                  ),
+                ],
+
+                if (_isSubmitting) ...[
+                  const SizedBox(height: 24),
+                  Center(
+                    child: CircularProgressIndicator(
+                        color: _themeColor),
+                  ),
+                ],
+              ]),
+            ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
-  // ── 손님 추가 섹션
+  // ── 손님 섹션
   Widget _buildGuestSection() {
     final changed = _guestCount != _existingGuests;
     return Container(
@@ -417,43 +558,57 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.withOpacity(0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: _themeColor.withOpacity(0.10),
+              blurRadius: 14,
+              offset: const Offset(0, 4)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2)),
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // 헤더
         Row(children: [
           Container(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10)),
+              gradient: LinearGradient(
+                colors: [_themeLighter, _themeColor],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
             child: const Icon(Icons.people_rounded,
-                color: Colors.orange, size: 18),
+                color: Colors.white, size: 18),
           ),
           const SizedBox(width: 10),
-          const Text('손님 동행', style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w900,
-              color: Color(0xFF1A1D2E))),
+          const Text('손님 동행',
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF1A1D2E))),
           const Spacer(),
           if (_existingGuests > 0)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                   color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8)),
               child: Text('$_existingGuests명 등록됨',
-                  style: const TextStyle(fontSize: 11,
-                      fontWeight: FontWeight.w700, color: Colors.green)),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.green)),
             ),
         ]),
-        const SizedBox(height: 6),
+        const SizedBox(height: 5),
         Text('함께 식사하는 손님이 있으면 인원을 추가해주세요',
             style: TextStyle(fontSize: 12, color: Colors.grey[500])),
         const SizedBox(height: 16),
-
-        // 인원 조절
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           _countBtn(Icons.remove_rounded,
               _guestCount > 0
@@ -462,18 +617,19 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
           const SizedBox(width: 24),
           Column(children: [
             Text('$_guestCount',
-                style: const TextStyle(fontSize: 36,
-                    fontWeight: FontWeight.w900, color: Colors.orange)),
-            const Text('명', style: TextStyle(fontSize: 12,
-                color: Color(0xFF8A93B0))),
+                style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    color: _themeColor)),
+            const Text('명',
+                style: TextStyle(
+                    fontSize: 12, color: Color(0xFF8A93B0))),
           ]),
           const SizedBox(width: 24),
           _countBtn(Icons.add_rounded,
               () => setState(() => _guestCount++),
               active: true),
         ]),
-
-        // 변경사항 있을 때 저장 버튼
         if (changed) ...[
           const SizedBox(height: 16),
           SizedBox(
@@ -481,20 +637,25 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
             child: ElevatedButton(
               onPressed: _guestSubmitting ? null : _saveGuest,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 14)),
+                backgroundColor: _themeColor,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
               child: _guestSubmitting
-                  ? const SizedBox(width: 18, height: 18,
+                  ? const SizedBox(
+                      width: 18, height: 18,
                       child: CircularProgressIndicator(
                           color: Colors.white, strokeWidth: 2))
                   : Text(
                       _guestCount == 0
                           ? '손님 정보 삭제'
                           : '손님 ${_guestCount}명 저장',
-                      style: const TextStyle(color: Colors.white,
-                          fontWeight: FontWeight.w800, fontSize: 14)),
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14)),
             ),
           ),
         ],
@@ -508,74 +669,194 @@ class _MealCheckScreenState extends State<MealCheckScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 44, height: 44,
+        width: 46, height: 46,
         decoration: BoxDecoration(
-            color: disabled
-                ? Colors.grey.withOpacity(0.08)
-                : active
-                    ? Colors.orange.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12)),
-        child: Icon(icon, size: 20,
+          color: disabled
+              ? Colors.grey.withOpacity(0.08)
+              : active
+                  ? _themeColor.withOpacity(0.12)
+                  : Colors.grey.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon,
+            size: 20,
             color: disabled
                 ? Colors.grey[300]
-                : active ? Colors.orange : Colors.grey[600]),
+                : active ? _themeColor : Colors.grey[600]),
       ),
     );
   }
+}
 
-  Widget _buildChoiceCard({
-    required String title, required String subtitle,
-    required IconData icon, required Color color,
-    required bool isSelected, required bool disabled,
-    required VoidCallback onTap,
-  }) {
-    final isDimmed = disabled && !isSelected;
-    return InkWell(
-      onTap: disabled ? null : onTap,
-      borderRadius: BorderRadius.circular(24),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        height: 180,
-        decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-              color: isSelected ? color : Colors.black.withOpacity(0.05),
-              width: 2),
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(color: color.withOpacity(0.3),
-                  blurRadius: 15, offset: const Offset(0, 8)),
-          ],
-        ),
-        child: Opacity(
-          opacity: isDimmed ? 0.25 : 1.0,
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withOpacity(0.2)
-                      : color.withOpacity(0.1),
-                  shape: BoxShape.circle),
-              child: Icon(icon, size: 40,
-                  color: isSelected ? Colors.white : color),
+// ══════════════════════════════════════════
+// 선택 카드 위젯
+// ══════════════════════════════════════════
+
+class _ChoiceCard extends StatefulWidget {
+  final String title, subtitle;
+  final IconData icon;
+  final Color color, lighter;
+  final bool isSelected, disabled;
+  final VoidCallback onTap;
+
+  const _ChoiceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.lighter,
+    required this.isSelected,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_ChoiceCard> createState() => _ChoiceCardState();
+}
+
+class _ChoiceCardState extends State<_ChoiceCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDimmed   = widget.disabled && !widget.isSelected;
+    final isSelected = widget.isSelected;
+    final c          = widget.color;
+    final lighter    = widget.lighter;
+
+    return GestureDetector(
+      onTapDown:   widget.disabled ? null : (_) => setState(() => _pressed = true),
+      onTapUp:     widget.disabled ? null : (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          height: 170,
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? LinearGradient(
+                    colors: [lighter, c],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [
+                      c.withOpacity(isDimmed ? 0.04 : 0.09),
+                      c.withOpacity(isDimmed ? 0.02 : 0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isSelected
+                  ? Colors.transparent
+                  : c.withOpacity(isDimmed ? 0.1 : 0.22),
+              width: isSelected ? 0 : 1.5,
             ),
-            const SizedBox(height: 16),
-            Text(title, style: TextStyle(fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: isSelected ? Colors.white : Colors.black87)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(fontSize: 12,
-                color: isSelected
-                    ? Colors.white.withOpacity(0.8) : Colors.black38)),
-            if (disabled && isSelected) ...[
-              const SizedBox(height: 8),
-              Icon(Icons.lock_rounded, size: 14,
-                  color: Colors.white.withOpacity(0.7)),
-            ],
-          ]),
+            boxShadow: isSelected && !_pressed
+                ? [
+                    BoxShadow(
+                      color: c.withOpacity(0.40),
+                      blurRadius: 18,
+                      offset: const Offset(0, 7),
+                    ),
+                  ]
+                : [],
+          ),
+          child: Opacity(
+            opacity: isDimmed ? 0.45 : 1.0,
+            child: Stack(clipBehavior: Clip.none, children: [
+              // 배경 하이라이트
+              if (isSelected)
+                Positioned(
+                  top: -20, right: -20,
+                  child: Container(
+                    width: 90, height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.10),
+                    ),
+                  ),
+                ),
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 아이콘
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.22)
+                            : c.withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        widget.icon,
+                        color: isSelected ? Colors.white : c,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // 제목
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        color: isSelected ? Colors.white : c,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    // 서브타이틀
+                    Text(
+                      widget.subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.75)
+                            : c.withOpacity(0.55),
+                      ),
+                    ),
+                    // 선택 완료 체크
+                    if (isSelected) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.22),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_rounded,
+                                color: Colors.white, size: 13),
+                            SizedBox(width: 4),
+                            Text('선택됨',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ]),
+          ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:translator/translator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'edit_notice_screen.dart';
 import 'app_strings.dart';
 import 'lang_context.dart';
@@ -102,10 +103,8 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     _markAsRead();
   }
 
-
   Future<void> _resendNotification() async {
     if (!mounted) return;
-    // await 전에 messenger 미리 캡처
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _isResending = true);
     bool? ok;
@@ -337,9 +336,7 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
             child: Column(children: [
-              // ── 풀블리드 헤더
               _buildHeroHeader(category, createdDate, catColor),
-              // ── 본문 영역
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
                 child: Column(children: [
@@ -374,7 +371,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     );
   }
 
-  // ── 플로팅 앱바 버튼
+  // ══════════════════════════════════════════
+  // AppBar 버튼
+  // ══════════════════════════════════════════
+
   Widget _floatBtn(IconData icon, Color color, VoidCallback? onTap, {bool loading = false}) {
     return GestureDetector(
       onTap: onTap,
@@ -394,7 +394,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     );
   }
 
-  // ── 히어로 헤더 (풀블리드)
+  // ══════════════════════════════════════════
+  // 히어로 헤더
+  // ══════════════════════════════════════════
+
   Widget _buildHeroHeader(String category, String createdDate, Color catColor) {
     final imageUrl = widget.notice['image_url'];
     final lightColor = HSLColor.fromColor(catColor)
@@ -411,31 +414,22 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
         ),
       ),
       child: Stack(children: [
-        // 배경 원 패턴
         Positioned(right: -40, top: -40,
           child: Container(width: 180, height: 180,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.07),
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.07)),
           ),
         ),
         Positioned(right: 40, bottom: -30,
           child: Container(width: 110, height: 110,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.05),
-            ),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
           ),
         ),
-        // 실제 내용
         SafeArea(
           bottom: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const SizedBox(height: 8),
-              // 태그 줄
               Row(children: [
                 _heroBadge(_deptIcon(category), _deptLabel(category)),
                 const SizedBox(width: 8),
@@ -444,7 +438,6 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
                 _heroBadge(Icons.translate_rounded, _langFullLabel(_selectedLang)),
               ]),
               const SizedBox(height: 20),
-              // 이미지 (있을 때)
               if (imageUrl != null) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
@@ -458,7 +451,6 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
                 ),
                 const SizedBox(height: 18),
               ],
-              // 제목
               Text(
                 _displayTitle,
                 style: const TextStyle(
@@ -492,7 +484,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     );
   }
 
-  // ── 번역 카드
+  // ══════════════════════════════════════════
+  // 번역 카드
+  // ══════════════════════════════════════════
+
   Widget _buildTranslateCard() {
     return _card(
       child: Column(children: [
@@ -547,12 +542,12 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(children: [
-                _langChip("🇰🇷 한국어",    "ko"),
-                _langChip("🇺🇸 English",  "en"),
-                _langChip("🇻🇳 Việt",     "vi"),
-                _langChip("🇰🇭 ខ្មែរ",     "km"),
-                _langChip("🇹🇭 ภาษาไทย",  "th"),
-                _langChip("🇺🇿 O'zbek",   "uz"),
+                _langChip("🇰🇷 한국어",   "ko"),
+                _langChip("🇺🇸 English", "en"),
+                _langChip("🇻🇳 Việt",    "vi"),
+                _langChip("🇰🇭 ខ្មែរ",    "km"),
+                _langChip("🇹🇭 ภาษาไทย", "th"),
+                _langChip("🇺🇿 O'zbek",  "uz"),
               ]),
             ),
           ),
@@ -561,7 +556,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     );
   }
 
-  // ── 본문 카드
+  // ══════════════════════════════════════════
+  // 본문 카드 (하이퍼링크 포함)
+  // ══════════════════════════════════════════
+
   Widget _buildContentCard(Color catColor) {
     return _card(
       padding: const EdgeInsets.all(20),
@@ -590,20 +588,107 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
           ),
         ),
         const SizedBox(height: 18),
-        Text(
-          _displayContent,
+        // ✅ 하이퍼링크 텍스트
+        _buildLinkedText(_displayContent, catColor),
+      ]),
+    );
+  }
+
+  /// URL을 자동 감지해서 탭 가능한 하이퍼링크로 렌더링합니다.
+  Widget _buildLinkedText(String text, Color linkColor) {
+    final urlRegex = RegExp(
+      r'(https?://[^\s\u200B-\u200D\uFEFF]+)',
+      caseSensitive: false,
+    );
+
+    final matches = urlRegex.allMatches(text).toList();
+
+    // URL이 없으면 일반 Text
+    if (matches.isEmpty) {
+      return Text(
+        text,
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.95,
+          color: Color(0xFF374151),
+          letterSpacing: -0.1,
+        ),
+      );
+    }
+
+    final spans = <InlineSpan>[];
+    int lastEnd = 0;
+
+    for (final match in matches) {
+      // 링크 앞 일반 텍스트
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
           style: const TextStyle(
             fontSize: 16,
             height: 1.95,
             color: Color(0xFF374151),
             letterSpacing: -0.1,
           ),
+        ));
+      }
+
+      final url = match.group(0)!;
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.baseline,
+        baseline: TextBaseline.alphabetic,
+        child: GestureDetector(
+          onTap: () async {
+            final uri = Uri.tryParse(url);
+            if (uri == null) return;
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (_) {
+              if (mounted) _snack("링크를 열 수 없습니다.", isError: true);
+            }
+          },
+          child: Padding(
+            // WidgetSpan 기준선 보정
+            padding: const EdgeInsets.only(bottom: 1),
+            child: Text(
+              url,
+              style: TextStyle(
+                fontSize: 16,
+                height: 1.95,
+                color: linkColor,
+                decoration: TextDecoration.underline,
+                decorationColor: linkColor,
+                letterSpacing: -0.1,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
-      ]),
-    );
+      ));
+
+      lastEnd = match.end;
+    }
+
+    // 마지막 남은 일반 텍스트
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: const TextStyle(
+          fontSize: 16,
+          height: 1.95,
+          color: Color(0xFF374151),
+          letterSpacing: -0.1,
+        ),
+      ));
+    }
+
+    return Text.rich(TextSpan(children: spans));
   }
 
-  // ── 통계 카드
+  // ══════════════════════════════════════════
+  // 통계 카드
+  // ══════════════════════════════════════════
+
   Widget _buildStatsCard() {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: Supabase.instance.client
@@ -623,7 +708,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
               final d = (r['dept_category'] ?? '').toString();
               deptRead[d] = (deptRead[d] ?? 0) + 1;
             }
-            const depts = ['MANAGEMENT','PRODUCTION','SALES','RND','STEEL','BOX','DELIVERY','SSG','CLEANING','NUTRITION'];
+            const depts = [
+              'MANAGEMENT','PRODUCTION','SALES','RND',
+              'STEEL','BOX','DELIVERY','SSG','CLEANING','NUTRITION',
+            ];
             return _card(
               padding: const EdgeInsets.all(20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -667,7 +755,10 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
     );
   }
 
-  // ── 확인 명단 카드
+  // ══════════════════════════════════════════
+  // 확인 명단 카드
+  // ══════════════════════════════════════════
+
   Widget _buildReadStatusCard() {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: Supabase.instance.client

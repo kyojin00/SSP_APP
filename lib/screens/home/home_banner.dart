@@ -9,7 +9,7 @@ class _StatusBanner extends StatelessWidget {
   final bool lunchChecked;
   final bool dinnerChecked;
   final bool attendanceChecked;
-  final bool isNutrition;       // ← 영양사 여부
+  final bool isNutrition;
   final VoidCallback onNoticeTap;
   final VoidCallback onMealTap;
   final VoidCallback onAttendanceTap;
@@ -27,7 +27,6 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 영양사는 배너 전체 숨김
     if (isNutrition) return const SizedBox.shrink();
 
     final hasUnreadNotice = unreadNoticeCount > 0;
@@ -50,7 +49,7 @@ class _StatusBanner extends StatelessWidget {
       ));
 
     if (hasUnreadNotice) {
-      if (tiles.isNotEmpty) tiles.add(const SizedBox(height: 8));
+      if (tiles.isNotEmpty) tiles.add(const SizedBox(height: 10));
       tiles.add(_BannerTile(
         icon:        Icons.campaign_rounded,
         color:       const Color(0xFF7C5CDB),
@@ -63,7 +62,7 @@ class _StatusBanner extends StatelessWidget {
     }
 
     if (mealUnchecked) {
-      if (tiles.isNotEmpty) tiles.add(const SizedBox(height: 8));
+      if (tiles.isNotEmpty) tiles.add(const SizedBox(height: 10));
       tiles.add(_BannerTile(
         icon:        Icons.restaurant_menu_rounded,
         color:       const Color(0xFFFF7A2F),
@@ -83,7 +82,9 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-class _BannerTile extends StatelessWidget {
+// ──────────────────────────────────────────
+
+class _BannerTile extends StatefulWidget {
   final IconData icon;
   final Color color;
   final String label;
@@ -99,44 +100,114 @@ class _BannerTile extends StatelessWidget {
   });
 
   @override
+  State<_BannerTile> createState() => _BannerTileState();
+}
+
+class _BannerTileState extends State<_BannerTile> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
+    final c = widget.color;
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 18),
+      onTapDown:    (_) => setState(() => _pressed = true),
+      onTapUp:      (_) { setState(() => _pressed = false); widget.onTap(); },
+      onTapCancel:  ()  => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: c.withOpacity(_pressed ? 0.08 : 0.18),
+                blurRadius: _pressed ? 8 : 20,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: color.withOpacity(0.9))),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration:
-                BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-            child: Text(actionLabel,
+          child: Row(children: [
+            // 그라디언트 아이콘 컨테이너
+            Container(
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [c, _lighten(c, 0.12)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: c.withOpacity(0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(widget.icon, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1D2E),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 액션 버튼
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [c, _lighten(c, 0.08)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: c.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Text(
+                widget.actionLabel,
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800)),
-          ),
-        ]),
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ]),
+        ),
       ),
     );
   }
+}
+
+// 헬퍼: 색상을 밝게
+Color _lighten(Color c, double amount) {
+  final hsl = HSLColor.fromColor(c);
+  return hsl.withLightness((hsl.lightness + amount).clamp(0.0, 1.0)).toColor();
 }

@@ -5,7 +5,6 @@ part of 'vehicle_screen.dart';
 // ══════════════════════════════════════════
 
 class _DS {
-  // Colors
   static const bg       = Color(0xFFF7F8FC);
   static const surface  = Colors.white;
   static const primary  = Color(0xFF2563EB);
@@ -16,20 +15,18 @@ class _DS {
   static const inkMid   = Color(0xFF64748B);
   static const inkFaint = Color(0xFFCBD5E1);
 
-  // Radius
   static const r8  = BorderRadius.all(Radius.circular(8));
   static const r12 = BorderRadius.all(Radius.circular(12));
   static const r16 = BorderRadius.all(Radius.circular(16));
   static const r20 = BorderRadius.all(Radius.circular(20));
   static const r24 = BorderRadius.all(Radius.circular(24));
 
-  // Shadow
   static List<BoxShadow> shadow({double blur = 20, double opacity = .06}) => [
     BoxShadow(
       color: const Color(0xFF0F172A).withOpacity(opacity),
       blurRadius: blur,
       offset: const Offset(0, 4),
-    )
+    ),
   ];
 }
 
@@ -52,13 +49,15 @@ class _OdometerOcr {
       }
 
       final response = await http.post(
-        Uri.parse('https://kvgyxjnozsngtpgleyvo.supabase.co/functions/v1/ocr_mileage'),
+        Uri.parse(
+            'https://kvgyxjnozsngtpgleyvo.supabase.co/functions/v1/ocr_mileage'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization':
               'Bearer ${Supabase.instance.client.auth.currentSession?.accessToken ?? ''}',
         },
-        body: jsonEncode({'imageBase64': base64Image, 'mediaType': mediaType}),
+        body: jsonEncode(
+            {'imageBase64': base64Image, 'mediaType': mediaType}),
       );
 
       if (response.statusCode != 200) return null;
@@ -66,7 +65,8 @@ class _OdometerOcr {
       final data    = jsonDecode(response.body);
       final rawText = data['text'] as String? ?? '';
 
-      if (rawText.trim().toUpperCase() == 'UNKNOWN' || rawText.trim().isEmpty) return null;
+      if (rawText.trim().toUpperCase() == 'UNKNOWN' ||
+          rawText.trim().isEmpty) return null;
 
       final onlyDigits = rawText.replaceAll(RegExp(r'[^0-9]'), '');
       return int.tryParse(onlyDigits);
@@ -193,7 +193,8 @@ class _OcrCameraBtnState extends State<_OcrCameraBtn>
                 ]),
               )
             : const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
+                Icon(Icons.camera_alt_rounded,
+                    color: Colors.white, size: 15),
                 SizedBox(width: 6),
                 Text('촬영',
                     style: TextStyle(
@@ -215,7 +216,10 @@ class _DepartureSheet extends StatefulWidget {
   final _Vehicle vehicle;
   final Map<String, dynamic> userProfile;
   final Future<void> Function(
-      String departure, String destination, String purpose, int mileageBefore) onSubmit;
+      String departure,
+      String destination,
+      String purpose,
+      int mileageBefore) onSubmit;
 
   const _DepartureSheet({
     required this.vehicle,
@@ -280,15 +284,19 @@ class _DepartureSheetState extends State<_DepartureSheet> {
     super.dispose();
   }
 
-  void _addDest()     => setState(() => _destCtrls.add(TextEditingController()));
+  void _addDest() =>
+      setState(() => _destCtrls.add(TextEditingController()));
+
   void _removeDest(int i) {
     if (_destCtrls.length <= 1) return;
     _destCtrls[i].dispose();
     setState(() => _destCtrls.removeAt(i));
   }
 
-  String get _destinationText =>
-      _destCtrls.map((c) => c.text.trim()).where((s) => s.isNotEmpty).join(' → ');
+  String get _destinationText => _destCtrls
+      .map((c) => c.text.trim())
+      .where((s) => s.isNotEmpty)
+      .join(' → ');
 
   Future<void> _submit() async {
     if (_departureCtrl.text.trim().isEmpty ||
@@ -328,7 +336,7 @@ class _DepartureSheetState extends State<_DepartureSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── 헤더 그라디언트 배너 ──
+          // ── 그라디언트 헤더
           _SheetHeader(
             icon: Icons.play_arrow_rounded,
             iconColor: _DS.success,
@@ -338,10 +346,10 @@ class _DepartureSheetState extends State<_DepartureSheet> {
             accentColor: _DS.success,
           ),
 
-          // ── 폼 본체 ──
+          // ── 폼 본체
           Flexible(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + bottom),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -353,7 +361,8 @@ class _DepartureSheetState extends State<_DepartureSheet> {
                     decoration: BoxDecoration(
                       color: _DS.bg,
                       borderRadius: _DS.r16,
-                      border: Border.all(color: _DS.inkFaint.withOpacity(.5)),
+                      border: Border.all(
+                          color: _DS.inkFaint.withOpacity(.5)),
                     ),
                     child: Column(children: [
                       _RouteField(
@@ -364,7 +373,6 @@ class _DepartureSheetState extends State<_DepartureSheet> {
                         isFirst: true,
                       ),
                       _RouteDivider(),
-                      // 목적지 다중
                       ...List.generate(_destCtrls.length, (i) {
                         final isLast = i == _destCtrls.length - 1;
                         return Column(children: [
@@ -373,8 +381,11 @@ class _DepartureSheetState extends State<_DepartureSheet> {
                             icon: isLast && _destCtrls.length > 1
                                 ? Icons.flag_rounded
                                 : Icons.place_rounded,
-                            iconColor: isLast ? _DS.primary : _DS.inkMid,
-                            hint: i == 0 ? '목적지 (예: 광양시청)' : '경유지 ${i + 1}',
+                            iconColor:
+                                isLast ? _DS.primary : _DS.inkMid,
+                            hint: i == 0
+                                ? '목적지 (예: 광양시청)'
+                                : '경유지 ${i + 1}',
                             trailing: _destCtrls.length > 1
                                 ? _RemoveBtn(() => _removeDest(i))
                                 : null,
@@ -395,7 +406,8 @@ class _DepartureSheetState extends State<_DepartureSheet> {
                           horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
                         border: Border.all(
-                            color: _DS.primary.withOpacity(.25), width: 1.5),
+                            color: _DS.primary.withOpacity(.25),
+                            width: 1.5),
                         borderRadius: _DS.r12,
                         color: _DS.primary.withOpacity(.04),
                       ),
@@ -458,14 +470,15 @@ class _DepartureSheetState extends State<_DepartureSheet> {
                     _InputField(
                       controller: _mileageCtrl,
                       icon: Icons.speed_rounded,
-                      hint: _isFirstRun ? '첫 운행 — 현재 계기판 수치 입력' : '예: 12345',
+                      hint: _isFirstRun
+                          ? '첫 운행 — 현재 계기판 수치 입력'
+                          : '예: 12345',
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
                     ),
-                    if (_mileageLoading)
-                      Positioned.fill(
-                        child: _LoadingOverlay(),
-                      ),
+                    if (_mileageLoading) Positioned.fill(child: _LoadingOverlay()),
                   ]),
                   const SizedBox(height: 6),
                   _HintChip(
@@ -538,9 +551,10 @@ class _ReturnSheetState extends State<_ReturnSheet> {
     final after  = int.tryParse(_mileageCtrl.text);
     final before = widget.log['mileage_before'] as int?;
     setState(() {
-      _distance = (after != null && before != null && after >= before)
-          ? after - before
-          : null;
+      _distance =
+          (after != null && before != null && after >= before)
+              ? after - before
+              : null;
     });
   }
 
@@ -572,9 +586,9 @@ class _ReturnSheetState extends State<_ReturnSheet> {
   Widget build(BuildContext context) {
     final bottom        = MediaQuery.of(context).viewInsets.bottom;
     final mileageBefore = widget.log['mileage_before'] as int? ?? 0;
-    final departure     = widget.log['departure']     as String? ?? '-';
-    final destination   = widget.log['destination']   as String? ?? '-';
-    final purpose       = widget.log['purpose']       as String? ?? '-';
+    final departure     = widget.log['departure']      as String? ?? '-';
+    final destination   = widget.log['destination']    as String? ?? '-';
+    final purpose       = widget.log['purpose']        as String? ?? '-';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 20),
@@ -585,6 +599,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // ── 그라디언트 헤더
           _SheetHeader(
             icon: Icons.flag_rounded,
             iconColor: _DS.primary,
@@ -595,11 +610,11 @@ class _ReturnSheetState extends State<_ReturnSheet> {
           ),
 
           SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(20, 4, 20, 24 + bottom),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 24 + bottom),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── 운행 요약 카드 ──
+                // ── 운행 요약 카드
                 _TripSummaryCard(
                   departure: departure,
                   destination: destination,
@@ -630,8 +645,11 @@ class _ReturnSheetState extends State<_ReturnSheet> {
                       icon: Icons.speed_rounded,
                       hint: '예: ${mileageBefore + 10}',
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      contentPadding: const EdgeInsets.fromLTRB(48, 14, 130, 14),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      contentPadding:
+                          const EdgeInsets.fromLTRB(48, 14, 130, 14),
                     ),
                     if (_distance != null)
                       Positioned(
@@ -645,7 +663,10 @@ class _ReturnSheetState extends State<_ReturnSheet> {
                                 horizontal: 10, vertical: 5),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                                colors: [
+                                  Color(0xFF2563EB),
+                                  Color(0xFF1D4ED8)
+                                ],
                               ),
                               borderRadius: _DS.r8,
                               boxShadow: _DS.shadow(blur: 8, opacity: .2),
@@ -692,11 +713,11 @@ class _ReturnSheetState extends State<_ReturnSheet> {
 // 공통 서브 위젯
 // ══════════════════════════════════════════
 
-/// 시트 헤더 (그라디언트 배너)
+/// 시트 헤더 — 그라디언트 배너 ✨
 class _SheetHeader extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
-  final Color iconBg;
+  final Color iconBg;      // 하위호환 (사용 안 함)
   final String title;
   final String subtitle;
   final Color accentColor;
@@ -710,50 +731,81 @@ class _SheetHeader extends StatelessWidget {
     required this.accentColor,
   });
 
+  Color _lighten(Color c, double a) {
+    final hsl = HSLColor.fromColor(c);
+    return hsl.withLightness((hsl.lightness + a).clamp(0.0, 1.0)).toColor();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lighter = _lighten(accentColor, 0.22);
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(.04),
+        gradient: LinearGradient(
+          colors: [lighter, accentColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(24),
+          topLeft:  Radius.circular(24),
           topRight: Radius.circular(24),
         ),
-        border: Border(
-          bottom: BorderSide(color: accentColor.withOpacity(.1), width: 1),
-        ),
       ),
-      child: Column(children: [
-        // 핸들
-        Container(
-          width: 36, height: 4,
-          margin: const EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-              color: _DS.inkFaint, borderRadius: _DS.r8),
-        ),
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: iconBg, borderRadius: _DS.r12),
-            child: Icon(icon, color: iconColor, size: 22),
+      child: Stack(children: [
+        // 배경 장식 원
+        Positioned(
+          right: -20, top: -20,
+          child: Container(
+            width: 100, height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.09),
+            ),
           ),
-          const SizedBox(width: 14),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: _DS.ink,
-                    letterSpacing: -.3)),
-            const SizedBox(height: 2),
-            Text(subtitle,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: _DS.inkMid,
-                    fontWeight: FontWeight.w600)),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+          child: Column(children: [
+            // 드래그 핸들
+            Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.45),
+                borderRadius:
+                    const BorderRadius.all(Radius.circular(2)),
+              ),
+            ),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.22),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -.3)),
+                const SizedBox(height: 3),
+                Text(subtitle,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.75),
+                        fontWeight: FontWeight.w600)),
+              ]),
+            ]),
           ]),
-        ]),
+        ),
       ]),
     );
   }
@@ -766,16 +818,16 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-    text,
-    style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        color: _DS.ink,
-        letterSpacing: -.1),
-  );
+        text,
+        style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: _DS.ink,
+            letterSpacing: -.1),
+      );
 }
 
-/// 경로 입력 필드 (카드 안에서 사용)
+/// 경로 입력 필드 (카드 안)
 class _RouteField extends StatelessWidget {
   final TextEditingController controller;
   final IconData icon;
@@ -821,9 +873,7 @@ class _RouteField extends StatelessWidget {
       ),
       if (trailing != null)
         Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: trailing!,
-        ),
+            padding: const EdgeInsets.only(right: 10), child: trailing!),
     ]);
   }
 }
@@ -841,8 +891,11 @@ class _RouteDivider extends StatelessWidget {
         SizedBox(
           height: 18,
           child: VerticalDivider(
-              width: 1, thickness: 1.5,
-              color: isVia ? _DS.warn.withOpacity(.4) : _DS.inkFaint),
+              width: 1,
+              thickness: 1.5,
+              color: isVia
+                  ? _DS.warn.withOpacity(.4)
+                  : _DS.inkFaint),
         ),
         if (isVia) ...[
           const SizedBox(width: 8),
@@ -864,16 +917,16 @@ class _RemoveBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-          color: _DS.danger.withOpacity(.08),
-          borderRadius: _DS.r8),
-      child: const Icon(Icons.close_rounded,
-          size: 15, color: _DS.danger),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+              color: _DS.danger.withOpacity(.08),
+              borderRadius: _DS.r8),
+          child: const Icon(Icons.close_rounded,
+              size: 15, color: _DS.danger),
+        ),
+      );
 }
 
 /// 경로 미리보기 칩
@@ -884,14 +937,16 @@ class _RoutePreviewChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: _DS.success.withOpacity(.06),
         borderRadius: _DS.r12,
         border: Border.all(color: _DS.success.withOpacity(.2)),
       ),
       child: Row(children: [
-        Icon(Icons.route_rounded, size: 15, color: _DS.success.withOpacity(.8)),
+        Icon(Icons.route_rounded,
+            size: 15, color: _DS.success.withOpacity(.8)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(text,
@@ -943,15 +998,15 @@ class _InputField extends StatelessWidget {
         filled: true,
         fillColor: _DS.bg,
         border: OutlineInputBorder(
-            borderRadius: _DS.r12,
-            borderSide: BorderSide.none),
+            borderRadius: _DS.r12, borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
             borderRadius: _DS.r12,
-            borderSide: BorderSide(
-                color: _DS.inkFaint.withOpacity(.6), width: 1)),
+            borderSide:
+                BorderSide(color: _DS.inkFaint.withOpacity(.6), width: 1)),
         focusedBorder: OutlineInputBorder(
             borderRadius: _DS.r12,
-            borderSide: const BorderSide(color: _DS.primary, width: 1.5)),
+            borderSide:
+                const BorderSide(color: _DS.primary, width: 1.5)),
         contentPadding: contentPadding ??
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
@@ -963,16 +1018,17 @@ class _InputField extends StatelessWidget {
 class _LoadingOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-        color: Colors.white.withOpacity(.75),
-        borderRadius: _DS.r12),
-    child: const Center(
-      child: SizedBox(
-          width: 16, height: 16,
-          child: CircularProgressIndicator(
-              strokeWidth: 2, color: _DS.primary)),
-    ),
-  );
+        decoration: BoxDecoration(
+            color: Colors.white.withOpacity(.75),
+            borderRadius: _DS.r12),
+        child: const Center(
+          child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: _DS.primary)),
+        ),
+      );
 }
 
 /// 힌트 칩
@@ -989,16 +1045,16 @@ class _HintChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-    Icon(icon, size: 13, color: color.withOpacity(.7)),
-    const SizedBox(width: 5),
-    Expanded(
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 11,
-              color: color.withOpacity(.8),
-              fontWeight: FontWeight.w600)),
-    ),
-  ]);
+        Icon(icon, size: 13, color: color.withOpacity(.7)),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(text,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: color.withOpacity(.8),
+                  fontWeight: FontWeight.w600)),
+        ),
+      ]);
 }
 
 /// 운행 요약 카드 (귀환 시트용)
@@ -1032,14 +1088,16 @@ class _TripSummaryCard extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Container(height: 1.5, color: _DS.inkFaint.withOpacity(.6)),
+                Container(height: 1.5,
+                    color: _DS.inkFaint.withOpacity(.6)),
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 3),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: _DS.r8,
-                    border: Border.all(color: _DS.inkFaint.withOpacity(.6)),
+                    border: Border.all(
+                        color: _DS.inkFaint.withOpacity(.6)),
                   ),
                   child: Text(purpose,
                       style: const TextStyle(
@@ -1055,29 +1113,25 @@ class _TripSummaryCard extends StatelessWidget {
         const SizedBox(height: 8),
         Row(children: [
           Expanded(
-            child: Text(departure,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _DS.ink)),
-          ),
+              child: Text(departure,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _DS.ink))),
           Expanded(
-            child: Text(destination,
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: _DS.ink)),
-          ),
+              child: Text(destination,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _DS.ink))),
         ]),
         const SizedBox(height: 12),
-        Container(
-          height: 1,
-          color: _DS.inkFaint.withOpacity(.4),
-        ),
+        Container(height: 1, color: _DS.inkFaint.withOpacity(.4)),
         const SizedBox(height: 12),
         Row(children: [
-          const Icon(Icons.speed_rounded, size: 14, color: _DS.inkMid),
+          const Icon(Icons.speed_rounded,
+              size: 14, color: _DS.inkMid),
           const SizedBox(width: 6),
           const Text('출발 전 계기판',
               style: TextStyle(
@@ -1096,14 +1150,18 @@ class _TripSummaryCard extends StatelessWidget {
   }
 
   Widget _dot(Color color) => Container(
-    width: 10, height: 10,
-    decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [BoxShadow(
-            color: color.withOpacity(.4),
-            blurRadius: 6, spreadRadius: 1)]),
-  );
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                  color: color.withOpacity(.4),
+                  blurRadius: 6,
+                  spreadRadius: 1)
+            ]),
+      );
 }
 
 /// 제출 버튼
@@ -1147,11 +1205,19 @@ class _SubmitButton extends StatelessWidget {
           children: [
             if (isLoading)
               const SizedBox(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2))
             else ...[
-              Icon(icon, color: Colors.white, size: 18),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.22),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 16),
+              ),
               const SizedBox(width: 8),
               Text(label,
                   style: const TextStyle(

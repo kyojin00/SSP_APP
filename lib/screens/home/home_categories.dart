@@ -293,27 +293,46 @@ extension HomeScreenCategories on _HomeScreenState {
                 () => _push(const MealReportScreen())),
         ],
       ),
+      // ── 출퇴근 리포트
       _Category(
-        title: context.tr(AppStrings.catWork),
+        title: '출퇴근 리포트',
         icon:  Icons.punch_clock_rounded,
         color: const Color(0xFF2E6BFF),
-        desc:  context.tr(AppStrings.catWorkDesc),
+        desc:  '근무중 · 퇴근 · 휴가 · 미출근',
+        items: [
+          _SubItem(Icons.punch_clock_rounded, '출퇴근 기록',
+              () => _push(AttendanceScreen(userProfile: _userProfile!))),
+          if (isManager)
+            _SubItem(Icons.how_to_reg_rounded, '출퇴근 현황',
+                () => _push(AttendanceManagementScreen(
+                    isManager: true, mode: 'attendance'))
+                    .then((_) => _loadBannerData())),
+        ],
+      ),
+      // ── 휴가 리포트
+      _Category(
+        title: '휴가 리포트',
+        icon:  Icons.flight_takeoff_rounded,
+        color: const Color(0xFF3D5AFE),
+        desc:  '실시간 현황 · 연차기록',
         badge: isManager && _pendingLeaveCount > 0 ? _pendingLeaveCount : null,
         items: [
-          _SubItem(Icons.punch_clock_rounded,
-              context.tr(AppStrings.attendance),
-              () => _push(AttendanceScreen(userProfile: _userProfile!))),
-          _SubItem(Icons.edit_calendar_rounded,
-              context.tr(AppStrings.leaveRequest),
-              () => _push(LeaveRequestScreen(userProfile: _userProfile!))),
-          _SubItem(Icons.flight_takeoff_rounded,
-              context.tr(AppStrings.leaveRealtime),
-              () => _push(AttendanceManagementScreen(isManager: false))),
-          if (isManager)
-            _SubItem(Icons.how_to_reg_rounded,
-                context.tr(AppStrings.attendanceMgmt),
-                () => _push(AttendanceManagementScreen(isManager: true)),
-                badge: _pendingLeaveCount > 0 ? _pendingLeaveCount : null),
+          _SubItem(Icons.edit_calendar_rounded, '휴가 신청',
+              () => _push(LeaveRequestScreen(userProfile: _userProfile!))
+                  .then((_) => _loadBannerData())),
+          if (isManager) ...[
+            _SubItem(Icons.flight_takeoff_rounded, '실시간 휴가 현황',
+                () => _push(AttendanceManagementScreen(
+                    isManager: true, mode: 'leave', initialTab: 0))
+                    .then((_) => _loadBannerData())),
+            _SubItem(Icons.history_rounded, '연차 기록',
+                () => _push(AttendanceManagementScreen(
+                    isManager: true, mode: 'leave', initialTab: 2))
+                    .then((_) => _loadBannerData()),
+                // ✅ isManager 체크 추가
+                badge: isManager && _pendingLeaveCount > 0
+                    ? _pendingLeaveCount : null),
+          ],
         ],
       ),
       _Category(
@@ -350,7 +369,7 @@ extension HomeScreenCategories on _HomeScreenState {
               () => _push(DormManagementScreen(
                   isAdmin: isAdmin, userProfile: _userProfile!))),
           _SubItem(Icons.grid_view_rounded, '호실 배치도',
-              () => _push(const DormRoomMapScreen())),
+              () => _push(DormRoomMapScreen(isAdmin: isAdmin))),
           _SubItem(Icons.cleaning_services_rounded, '베란다 청소',
               () => _push(CleaningScreen(userProfile: _userProfile!))),
         ],
@@ -390,7 +409,8 @@ extension HomeScreenCategories on _HomeScreenState {
                 () => _push(VehicleScreen(
                     userProfile: _userProfile!, isAdmin: isAdmin))),
             _SubItem(Icons.local_gas_station_rounded, '주유 신청',
-                () => _push(FuelCardScreen(isAdmin: isAdmin)),
+                () => _push(FuelCardScreen(isAdmin: isAdmin))
+                    .then((_) => _loadBannerData()),
                 badge: isAdmin && _pendingFuelCount > 0
                     ? _pendingFuelCount : null),
           ],
@@ -405,7 +425,8 @@ extension HomeScreenCategories on _HomeScreenState {
           _SubItem(Icons.checkroom_rounded,
               context.tr(AppStrings.uniformTitle),
               () => _push(UniformRequestScreen(
-                  userProfile: _userProfile!, isAdmin: isAdmin)),
+                  userProfile: _userProfile!, isAdmin: isAdmin))
+                  .then((_) => _loadBannerData()),
               badge: isAdmin && _pendingUniformCount > 0
                   ? _pendingUniformCount : null),
           _SubItem(Icons.credit_card_rounded, '명함 지갑',

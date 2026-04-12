@@ -65,8 +65,8 @@ class _HomeScreenState extends State<HomeScreen>
   final supabase = Supabase.instance.client;
 
   Map<String, dynamic>? _userProfile;
-  bool _isLoading = true;
-  bool _booted = false;
+  bool _isLoading  = true;
+  bool _booted     = false;
   bool _langListenerAdded = false;
 
   DateTime? _lastBackPress;
@@ -75,15 +75,15 @@ class _HomeScreenState extends State<HomeScreen>
   late final List<Animation<double>> _cardAnims;
   static const int _maxCards = 6;
 
-  int _unreadNoticeCount = 0;
-  bool _lunchChecked   = false;
-  bool _dinnerChecked  = false;
-  bool _attendanceChecked = false;
-  bool _bannerLoading  = true;
-  int _pendingFuelCount    = 0;
+  int  _unreadNoticeCount  = 0;
+  bool _lunchChecked       = false;
+  bool _dinnerChecked      = false;
+  bool _attendanceChecked  = false;
+  bool _bannerLoading      = true;
+  int  _pendingFuelCount    = 0;
+  int  _pendingLeaveCount   = 0;
+  int  _pendingUniformCount = 0;
   List<String> _quickActionIds = ['meal_check', 'attendance'];
-  int _pendingLeaveCount   = 0;
-  int _pendingUniformCount = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -91,6 +91,10 @@ class _HomeScreenState extends State<HomeScreen>
   void _onLangChanged() {
     if (mounted) setState(() {});
   }
+
+  // ──────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────
 
   @override
   void initState() {
@@ -157,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
       setState(() {
         _userProfile = data;
-        _isLoading = false;
+        _isLoading   = false;
       });
       if (_cardCtrl.status == AnimationStatus.dismissed) _cardCtrl.forward();
       await _loadBannerData();
@@ -177,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen>
     const mgrRanks = ['과장', '차장', '부장', '이사', '본부장', '대표이사'];
     final isManager = isAdmin || mgrRanks.contains(position);
     try {
-      final futures = [
+      final futures = <Future>[
         supabase.from('notices').select('id'),
         supabase.from('notice_reads').select('notice_id').eq('user_id', user.id),
         supabase.from('meal_requests').select('meal_type')
@@ -191,32 +195,33 @@ class _HomeScreenState extends State<HomeScreen>
       }
       if (isManager) {
         futures.add(supabase.from('leave_requests')
-            .select('id')
-            .eq('step1_status', 'PENDING'));
+            .select('id').eq('step1_status', 'PENDING'));
       }
       if (isAdmin) {
         futures.add(supabase.from('uniform_requests')
             .select('id').eq('status', 'PENDING'));
       }
-      final results = await Future.wait(futures);
+
+      final results     = await Future.wait(futures);
       final allNotices  = results[0] as List;
       final readNotices = results[1] as List;
       final todayMeals  = results[2] as List;
       final todayAttend = results[3] as List;
-      final readIds = readNotices.map((r) => r['notice_id'] as String).toSet();
+      final readIds     = readNotices.map((r) => r['notice_id'] as String).toSet();
       final unreadCount = allNotices
           .where((n) => !readIds.contains(n['id'] as String)).length;
       final lunchChecked  = todayMeals.any((r) => r['meal_type'] == 'LUNCH');
       final dinnerChecked = todayMeals.any((r) => r['meal_type'] == 'DINNER');
       final attendChecked = todayAttend.isNotEmpty;
-      final pendingFuel    = isAdmin && results.length > 4
+      final pendingFuel   = isAdmin && results.length > 4
           ? (results[4] as List).length : 0;
-      final leaveIdx       = isAdmin ? 5 : 4;
-      final pendingLeave   = isManager && results.length > leaveIdx
+      final leaveIdx      = isAdmin ? 5 : 4;
+      final pendingLeave  = isManager && results.length > leaveIdx
           ? (results[leaveIdx] as List).length : 0;
-      final uniformIdx     = leaveIdx + (isManager ? 1 : 0);
+      final uniformIdx    = leaveIdx + (isManager ? 1 : 0);
       final pendingUniform = isAdmin && results.length > uniformIdx
           ? (results[uniformIdx] as List).length : 0;
+
       if (!mounted) return;
       setState(() {
         _unreadNoticeCount   = unreadCount;
@@ -252,12 +257,10 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
       debugPrint('[OneSignal] reconnected onesignalId=$id');
-      if (showSnack && mounted)
-        _snack(context.tr(AppStrings.notifReconnectDone));
+      if (showSnack && mounted) _snack(context.tr(AppStrings.notifReconnectDone));
     } catch (e) {
       debugPrint('[OneSignal] reconnect error: $e');
-      if (showSnack && mounted)
-        _snack(context.tr(AppStrings.notifReconnectFail));
+      if (showSnack && mounted) _snack(context.tr(AppStrings.notifReconnectFail));
     }
   }
 
@@ -267,10 +270,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (user == null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getStringList('quick_actions_\${user.id}');
+      final saved = prefs.getStringList('quick_actions_${user.id}');
       if (saved != null && mounted) setState(() => _quickActionIds = saved);
     } catch (e) {
-      debugPrint('퀵액션 로드 실패: \$e');
+      debugPrint('퀵액션 로드 실패: $e');
     }
   }
 
@@ -279,10 +282,10 @@ class _HomeScreenState extends State<HomeScreen>
     if (user == null) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('quick_actions_\${user.id}', ids);
+      await prefs.setStringList('quick_actions_${user.id}', ids);
       if (mounted) setState(() => _quickActionIds = ids);
     } catch (e) {
-      debugPrint('퀵액션 저장 실패: \$e');
+      debugPrint('퀵액션 저장 실패: $e');
     }
   }
 
@@ -290,8 +293,7 @@ class _HomeScreenState extends State<HomeScreen>
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(context.tr(AppStrings.logout),
             style: const TextStyle(fontWeight: FontWeight.w900)),
         content: Text(context.tr(AppStrings.logoutConfirm),
@@ -351,30 +353,30 @@ class _HomeScreenState extends State<HomeScreen>
       const m = {
         'MANAGEMENT': '관리부',
         'PRODUCTION': '생산관리부',
-        'SALES': '영업부',
-        'RND': '연구소',
-        'STEEL': '스틸생산부',
-        'BOX': '박스생산부',
-        'DELIVERY': '포장납품부',
-        'SSG': '에스에스지',
-        'CLEANING': '환경미화',
-        'NUTRITION': '영양사',
-        'ADMIN': '관리자',
+        'SALES':      '영업부',
+        'RND':        '연구소',
+        'STEEL':      '스틸생산부',
+        'BOX':        '박스생산부',
+        'DELIVERY':   '포장납품부',
+        'SSG':        '에스에스지',
+        'CLEANING':   '환경미화',
+        'NUTRITION':  '영양사',
+        'ADMIN':      '관리자',
       };
       return m[c] ?? c;
     }
     return switch (c) {
       'MANAGEMENT' => ctx.tr(AppStrings.deptManagement),
       'PRODUCTION' => ctx.tr(AppStrings.deptProduction),
-      'SALES' => ctx.tr(AppStrings.deptSales),
-      'RND' => ctx.tr(AppStrings.deptRnd),
-      'STEEL' => ctx.tr(AppStrings.deptSteel),
-      'BOX' => ctx.tr(AppStrings.deptBox),
-      'DELIVERY' => ctx.tr(AppStrings.deptDelivery),
-      'SSG' => ctx.tr(AppStrings.deptSsg),
-      'CLEANING' => ctx.tr(AppStrings.deptCleaning),
-      'NUTRITION' => ctx.tr(AppStrings.deptNutrition),
-      _ => c,
+      'SALES'      => ctx.tr(AppStrings.deptSales),
+      'RND'        => ctx.tr(AppStrings.deptRnd),
+      'STEEL'      => ctx.tr(AppStrings.deptSteel),
+      'BOX'        => ctx.tr(AppStrings.deptBox),
+      'DELIVERY'   => ctx.tr(AppStrings.deptDelivery),
+      'SSG'        => ctx.tr(AppStrings.deptSsg),
+      'CLEANING'   => ctx.tr(AppStrings.deptCleaning),
+      'NUTRITION'  => ctx.tr(AppStrings.deptNutrition),
+      _            => c,
     };
   }
 
@@ -410,7 +412,7 @@ class _HomeScreenState extends State<HomeScreen>
     return WillPopScope(
       onWillPop: () async {
         if (Navigator.of(context).canPop()) return true;
-        final now = DateTime.now();
+        final now   = DateTime.now();
         final first = _lastBackPress == null ||
             now.difference(_lastBackPress!) > const Duration(seconds: 2);
         if (first) {
@@ -446,15 +448,14 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildBody(BuildContext context) {
-    final isAdmin = _userProfile!['role'] == 'ADMIN';
-    final position = _userProfile!['position'] as String? ?? '';
-    const mgr = ['과장', '차장', '부장', '이사', '본부장', '대표이사'];
-    final isManager = isAdmin || mgr.contains(position);
+    final isAdmin    = _userProfile!['role'] == 'ADMIN';
+    final position   = _userProfile!['position'] as String? ?? '';
+    const mgr        = ['과장', '차장', '부장', '이사', '본부장', '대표이사'];
+    final isManager  = isAdmin || mgr.contains(position);
     final isNutrition = (_userProfile!['dept_category'] ?? '') == 'NUTRITION';
-    final name = _userProfile!['full_name'] ?? '';
-    final dept = _deptLabel(_userProfile!['dept_category'] ?? '', context);
-    final categories =
-        _buildCategories(context, isAdmin, isManager, isNutrition, dept);
+    final name       = _userProfile!['full_name'] ?? '';
+    final dept       = _deptLabel(_userProfile!['dept_category'] ?? '', context);
+    final categories = _buildCategories(context, isAdmin, isManager, isNutrition, dept);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F7),
@@ -469,21 +470,24 @@ class _HomeScreenState extends State<HomeScreen>
               delegate: SliverChildListDelegate([
                 if (!_bannerLoading)
                   _StatusBanner(
-                    unreadNoticeCount:  _unreadNoticeCount,
-                    lunchChecked:       _lunchChecked,
-                    dinnerChecked:      _dinnerChecked,
-                    attendanceChecked:  _attendanceChecked,
+                    unreadNoticeCount: _unreadNoticeCount,
+                    lunchChecked:      _lunchChecked,
+                    dinnerChecked:     _dinnerChecked,
+                    attendanceChecked: _attendanceChecked,
+                    isNutrition:       isNutrition,
                     onNoticeTap: () =>
                         _push(NoticeListScreen(isAdmin: isAdmin, myDept: dept)),
                     onMealTap:        _showMealSheet,
-                    onAttendanceTap:  () => _push(AttendanceScreen(
-                        userProfile: _userProfile!)),
+                    onAttendanceTap:  () =>
+                        _push(AttendanceScreen(userProfile: _userProfile!)),
                   ),
                 if (!_bannerLoading) const SizedBox(height: 20),
-                _quickActions(isAdmin, isNutrition, _userProfile!['dept_category'] as String? ?? ''),
+                _quickActions(
+                    isAdmin, isNutrition,
+                    _userProfile!['dept_category'] as String? ?? ''),
                 const SizedBox(height: 24),
                 _SectionHeader(
-                  title: context.tr(AppStrings.menu),
+                  title:    context.tr(AppStrings.menu),
                   subtitle: context.tr(AppStrings.menuSubtitle),
                 ),
                 const SizedBox(height: 14),
@@ -492,10 +496,10 @@ class _HomeScreenState extends State<HomeScreen>
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate:
                       const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 12,
+                    crossAxisCount:  4,
+                    mainAxisSpacing:  16,
                     crossAxisSpacing: 12,
-                    childAspectRatio: 0.9,
+                    childAspectRatio: 0.78,
                   ),
                   itemCount: categories.length,
                   itemBuilder: (_, i) {
@@ -508,9 +512,8 @@ class _HomeScreenState extends State<HomeScreen>
                             scale: _cardAnims[idx], child: child),
                       ),
                       child: _CategoryCard(
-                        cat: categories[i],
-                        onTap: () =>
-                            _showCategorySheet(context, categories[i]),
+                        cat:   categories[i],
+                        onTap: () => _showCategorySheet(context, categories[i]),
                       ),
                     );
                   },
@@ -523,10 +526,38 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // ──────────────────────────────────────────
+  // SliverAppBar — 개선된 헤더
+  // ──────────────────────────────────────────
+
   Widget _sliverAppBar(BuildContext context, String name, String dept,
       String position, bool isAdmin) {
+    // 시간대별 인사
+    final hour = DateTime.now().hour;
+    final String greeting;
+    final String greetingEmoji;
+    if (hour < 12) {
+      greeting      = '좋은 아침이에요';
+      greetingEmoji = '🌅';
+    } else if (hour < 18) {
+      greeting      = '좋은 오후예요';
+      greetingEmoji = '☀️';
+    } else {
+      greeting      = '좋은 저녁이에요';
+      greetingEmoji = '🌙';
+    }
+
+    // 오늘 날짜
+    final now      = DateTime.now();
+    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekday  = weekdays[now.weekday - 1];
+    final dateStr  = '${now.month}월 ${now.day}일 $weekday요일';
+
+    // 아바타 이니셜
+    final initial = name.isNotEmpty ? name[0] : '?';
+
     return SliverAppBar(
-      expandedHeight: 195,
+      expandedHeight: 210,
       floating: false,
       pinned: true,
       stretch: true,
@@ -534,11 +565,14 @@ class _HomeScreenState extends State<HomeScreen>
       elevation: 0,
       scrolledUnderElevation: 0,
       backgroundColor: const Color(0xFF1E4AD9),
-      title: Text(context.tr(AppStrings.appName),
-          style: TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              color: Colors.white.withOpacity(0.92))),
+      title: Text(
+        context.tr(AppStrings.appName),
+        style: TextStyle(
+          fontWeight: FontWeight.w900,
+          fontSize: 18,
+          color: Colors.white.withOpacity(0.92),
+        ),
+      ),
       actions: [
         GestureDetector(
           onTap: _logout,
@@ -559,111 +593,184 @@ class _HomeScreenState extends State<HomeScreen>
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF1A3EC7),
-                Color(0xFF2E6BFF),
-                Color(0xFF4FB8FF)
+                Color(0xFF1229A8),
+                Color(0xFF1E4AD9),
+                Color(0xFF3A7FFF),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
           ),
           child: Stack(children: [
+            // ── 배경 장식 원들
             Positioned(
-              right: -40,
-              top: -40,
-              child: CircleAvatar(
-                  radius: 110,
-                  backgroundColor: Colors.white.withOpacity(0.05)),
+              right: -50, top: -50,
+              child: Container(
+                width: 220, height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.06),
+                ),
+              ),
             ),
             Positioned(
-              left: -20,
-              bottom: -30,
-              child: CircleAvatar(
-                  radius: 80,
-                  backgroundColor: Colors.white.withOpacity(0.04)),
+              left: -30, bottom: -50,
+              child: Container(
+                width: 160, height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.04),
+                ),
+              ),
             ),
+            Positioned(
+              right: 60, bottom: 20,
+              child: Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.05),
+                ),
+              ),
+            ),
+
+            // ── 본문
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 75, 20, 0),
-              child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
+              padding: const EdgeInsets.fromLTRB(20, 78, 20, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 인사 뱃지 + 날짜
+                  Row(children: [
                     Container(
-                      width: 62,
-                      height: 62,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(22),
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.3),
-                            width: 1.5),
+                            color: Colors.white.withOpacity(0.25)),
                       ),
-                      child: const Icon(Icons.person_rounded,
-                          color: Colors.white, size: 36),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(children: [
-                            Text(name,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 21,
-                                    fontWeight: FontWeight.w900)),
-                            const SizedBox(width: 8),
-                            if (isAdmin)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: Colors.orangeAccent,
-                                    borderRadius:
-                                        BorderRadius.circular(6)),
-                                child: const Text("ADMIN",
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900)),
-                              ),
-                          ]),
-                          const SizedBox(height: 5),
-                          Text("$dept  ·  $position",
-                              style: TextStyle(
-                                  color: Colors.white.withOpacity(0.8),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 11, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.calendar_today_rounded,
-                                      color: Colors.white70, size: 12),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    DateFormat('yyyy.MM.dd (E)', 'ko_KR')
-                                        .format(DateTime.now()),
-                                    style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                ]),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(greetingEmoji,
+                            style: const TextStyle(fontSize: 13)),
+                        const SizedBox(width: 5),
+                        Text(
+                          greeting,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      dateStr,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.65),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ]),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 아바타
+                      Container(
+                        width: 58, height: 58,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6B9FFF), Color(0xFF4078FF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                              color: Colors.white.withOpacity(0.4),
+                              width: 2.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      // 이름 + 뱃지
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '$name님',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                _headerBadge(
+                                    dept, Colors.white.withOpacity(0.2)),
+                                if (position.isNotEmpty)
+                                  _headerBadge(position,
+                                      Colors.white.withOpacity(0.15)),
+                                if (isAdmin)
+                                  _headerBadge('ADMIN',
+                                      const Color(0xFFFF7A2F).withOpacity(0.7)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ]),
+        ),
+      ),
+    );
+  }
+
+  /// 헤더 뱃지
+  Widget _headerBadge(String label, Color bgColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

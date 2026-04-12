@@ -91,12 +91,12 @@ extension HomeScreenSheets on _HomeScreenState {
               ),
               Row(children: [
                 Container(
-                  padding: const EdgeInsets.all(9),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                       color: const Color(0xFF2E6BFF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(10)),
                   child: const Icon(Icons.language_rounded,
-                      color: Color(0xFF2E6BFF), size: 22),
+                      color: Color(0xFF2E6BFF), size: 20),
                 ),
                 const SizedBox(width: 12),
                 Text(context.tr(AppStrings.langSettings),
@@ -108,9 +108,10 @@ extension HomeScreenSheets on _HomeScreenState {
                 padding: const EdgeInsets.only(left: 4),
                 child: Text(context.tr(AppStrings.langSubtitle),
                     style: TextStyle(
-                        fontSize: 12, color: Colors.black.withOpacity(0.4))),
+                        fontSize: 12,
+                        color: Colors.black.withOpacity(0.4))),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               ...kSupportedLangs.map((lang) {
                 final isSelected = langProvider.lang == lang.code;
                 return GestureDetector(
@@ -192,53 +193,104 @@ extension HomeScreenSheets on _HomeScreenState {
         builder: (_, scrollController) => Container(
           margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
           decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28)),
+            color: const Color(0xFFF4F6FB),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Column(children: [
-            // ── 고정 헤더 ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
-              child: Column(children: [
-                // 드래그 핸들
-                Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2)),
+            // ── 그라디언트 헤더 ──
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [_lighten(cat.color, 0.18), cat.color],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
+              ),
+              child: Stack(children: [
+                // 배경 장식 원
+                Positioned(
+                  top: -25, right: -25,
+                  child: Container(
+                    width: 110, height: 110,
                     decoration: BoxDecoration(
-                      color: cat.color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(14),
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.10),
                     ),
-                    child: Icon(cat.icon, color: cat.color, size: 24),
                   ),
-                  const SizedBox(width: 14),
-                  Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(cat.title,
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w900)),
-                        Text(cat.desc,
-                            style: TextStyle(
+                ),
+                Positioned(
+                  bottom: -30, left: 40,
+                  child: Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.06),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 22),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 드래그 핸들
+                      Center(
+                        child: Container(
+                          width: 36, height: 4,
+                          margin: const EdgeInsets.only(bottom: 18),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.45),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                        // 아이콘 컨테이너
+                        Container(
+                          padding: const EdgeInsets.all(13),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.22),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(cat.icon, color: Colors.white, size: 26),
+                        ),
+                        const SizedBox(width: 15),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cat.title,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              cat.desc,
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.black.withOpacity(0.4))),
+                                color: Colors.white.withOpacity(0.72),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ]),
-                ]),
-                const SizedBox(height: 16),
-                Divider(height: 1, color: Colors.black.withOpacity(0.06)),
+                    ],
+                  ),
+                ),
               ]),
             ),
-            // ── 스크롤 영역 ──
+
+            // ── 메뉴 아이템 스크롤 영역 ──
             Expanded(
               child: ListView(
                 controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(22, 14, 22, 24),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
                 children: cat.items
                     .map((sub) => _SheetMenuItem(sub: sub, color: cat.color))
                     .toList(),

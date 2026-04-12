@@ -30,8 +30,13 @@ class _Vehicle {
   final String vehicleType; // 'DELIVERY' | 'OFFICE'
   Map<String, dynamic>? currentLog;
 
-  _Vehicle({required this.id, required this.name,
-      required this.plateNumber, this.vehicleType = 'OFFICE', this.currentLog});
+  _Vehicle({
+    required this.id,
+    required this.name,
+    required this.plateNumber,
+    this.vehicleType = 'OFFICE',
+    this.currentLog,
+  });
 }
 
 // ══════════════════════════════════════════
@@ -41,8 +46,11 @@ class _Vehicle {
 class VehicleScreen extends StatefulWidget {
   final Map<String, dynamic> userProfile;
   final bool isAdmin;
-  const VehicleScreen({Key? key, required this.userProfile, required this.isAdmin})
-      : super(key: key);
+  const VehicleScreen({
+    Key? key,
+    required this.userProfile,
+    required this.isAdmin,
+  }) : super(key: key);
 
   @override
   State<VehicleScreen> createState() => _VehicleScreenState();
@@ -56,27 +64,19 @@ class _VehicleScreenState extends State<VehicleScreen>
   bool _isLoading = true;
   List<_Vehicle> _vehicles = [];
 
-  static const _primary = Color(0xFF2E6BFF);
-  static const _bg      = Color(0xFFF0F2F7);
+  static const _primary  = Color(0xFF2E6BFF);
+  static const _teal     = Color(0xFF00BFA5);
+  static const _tealDark = Color(0xFF00897B);
+  static const _bg       = Color(0xFFF0F2F7);
 
-  // ── 부서별 접근 권한
   String get _dept =>
       widget.userProfile['dept_category'] as String? ?? '';
 
-  /// 납품차량(트럭)만 볼 수 있는 부서
   bool get _onlyDelivery => _dept == 'DELIVERY';
-
-  /// 납품차량 + 사무차량 둘 다 볼 수 있는 부서
   bool get _showBoth =>
       widget.isAdmin || ['PRODUCTION', 'SALES', 'MANAGEMENT'].contains(_dept);
-
-  /// 접근 가능 여부
   bool get _hasAccess => widget.isAdmin || _onlyDelivery || _showBoth;
-
-  int get _tabCount {
-    if (_showBoth) return 2;
-    return 1;
-  }
+  int  get _tabCount  => _showBoth ? 2 : 1;
 
   List<_Vehicle> get _deliveryVehicles =>
       _vehicles.where((v) => v.vehicleType == 'DELIVERY').toList();
@@ -112,7 +112,8 @@ class _VehicleScreenState extends State<VehicleScreen>
 
       final drivingMap = <String, Map<String, dynamic>>{};
       for (final log in drivingLogs) {
-        drivingMap[log['vehicle_id'] as String] = log as Map<String, dynamic>;
+        drivingMap[log['vehicle_id'] as String] =
+            log as Map<String, dynamic>;
       }
 
       if (!mounted) return;
@@ -163,69 +164,185 @@ class _VehicleScreenState extends State<VehicleScreen>
       tabs = [Tab(text: '납품차량 (${delivery.length})')];
       tabViews = [_vehicleListTab(delivery)];
     } else {
-      // 접근 불가 — 빈 탭 (body에서 처리)
       tabs = [const Tab(text: '-')];
       tabViews = [const SizedBox.shrink()];
     }
 
     return Scaffold(
       backgroundColor: _bg,
-      appBar: AppBar(
-        title: const Text('차량 일지',
-            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1D2E),
-        elevation: 0,
-        surfaceTintColor: Colors.white,
-        bottom: _hasAccess
-            ? TabBar(
-                controller: _tabCtrl,
-                labelColor: _primary,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: _primary,
-                indicatorWeight: 3,
-                dividerColor: Colors.transparent,
-                tabs: tabs,
-              )
-            : null,
-        actions: [
-          if (widget.isAdmin)
-            IconButton(
-              onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) =>
-                      VehicleStatsScreen(vehicles: _vehicles))),
-              icon: const Icon(Icons.bar_chart_rounded),
-              tooltip: '주행 통계',
+      body: NestedScrollView(
+        headerSliverBuilder: (context, _) => [
+          // ── 그라디언트 SliverAppBar
+          SliverAppBar(
+            expandedHeight: 200,
+            pinned: true,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: _tealDark,
+            foregroundColor: Colors.white,
+            title: const Text(
+              '차량 일지',
+              style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 17,
+                  color: Colors.white),
             ),
-          IconButton(
-            onPressed: _loadData,
-            icon: const Icon(Icons.refresh_rounded),
+            actions: [
+              if (widget.isAdmin)
+                Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  child: IconButton(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                VehicleStatsScreen(vehicles: _vehicles))),
+                    icon: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.bar_chart_rounded,
+                          color: Colors.white, size: 18),
+                    ),
+                    tooltip: '주행 통계',
+                  ),
+                ),
+              Container(
+                margin: const EdgeInsets.only(right: 12),
+                child: IconButton(
+                  onPressed: _loadData,
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.refresh_rounded,
+                        color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.parallax,
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF004D40), _tealDark, _teal],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Stack(children: [
+                  Positioned(
+                    right: -40, top: -40,
+                    child: Container(
+                      width: 180, height: 180,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.07),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: -20, bottom: -30,
+                    child: Container(
+                      width: 130, height: 130,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.05),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 80, 20, 54),
+                    child: Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.directions_car_rounded,
+                            color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const Text('차량 운행 일지',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900)),
+                        Text(
+                          '${_vehicles.length}대 등록 · '
+                          '${_vehicles.where((v) => v.currentLog != null).length}대 운행 중',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.72),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ]),
+                    ]),
+                  ),
+                ]),
+              ),
+            ),
+            bottom: _hasAccess
+                ? TabBar(
+                    controller: _tabCtrl,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.white.withOpacity(0.6),
+                    indicatorColor: Colors.white,
+                    indicatorWeight: 3,
+                    dividerColor: Colors.white.withOpacity(0.15),
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    tabs: tabs,
+                  )
+                : null,
           ),
         ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _primary))
-          : !_hasAccess
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.lock_outline_rounded,
-                          size: 52, color: Colors.grey[300]),
-                      const SizedBox(height: 12),
-                      Text('접근 권한이 없습니다.',
-                          style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600)),
-                    ],
+        body: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: _teal))
+            : !_hasAccess
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4))
+                            ],
+                          ),
+                          child: Icon(Icons.lock_outline_rounded,
+                              size: 40, color: Colors.grey[300]),
+                        ),
+                        const SizedBox(height: 16),
+                        Text('접근 권한이 없습니다.',
+                            style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    controller: _tabCtrl,
+                    children: tabViews,
                   ),
-                )
-              : TabBarView(
-                  controller: _tabCtrl,
-                  children: tabViews,
-                ),
+      ),
     );
   }
 
@@ -234,33 +351,90 @@ class _VehicleScreenState extends State<VehicleScreen>
     final available = vehicles.length - driving;
 
     return RefreshIndicator(
-      color: _primary,
+      color: _teal,
       onRefresh: _loadData,
       child: ListView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         children: [
-          Row(children: [
-            Expanded(child: _summaryChip(
-                Icons.check_circle_rounded, Colors.green, '사용 가능', '$available대')),
-            const SizedBox(width: 10),
-            Expanded(child: _summaryChip(
-                Icons.drive_eta_rounded, Colors.orange, '운행 중', '$driving대')),
-            const SizedBox(width: 10),
-            Expanded(child: _summaryChip(
-                Icons.garage_rounded, _primary, '전체', '${vehicles.length}대')),
-          ]),
-          const SizedBox(height: 20),
+          // 요약 카드
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF004D40), _tealDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: _tealDark.withOpacity(0.30),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Stack(children: [
+              Positioned(
+                right: -20, top: -20,
+                child: Container(
+                  width: 90, height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(0.07),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _summaryChip(Icons.check_circle_rounded,
+                      Colors.greenAccent, '사용 가능', '$available대'),
+                  Container(
+                      width: 1, height: 36,
+                      color: Colors.white.withOpacity(0.2)),
+                  _summaryChip(Icons.drive_eta_rounded,
+                      Colors.orangeAccent, '운행 중', '$driving대'),
+                  Container(
+                      width: 1, height: 36,
+                      color: Colors.white.withOpacity(0.2)),
+                  _summaryChip(Icons.garage_rounded,
+                      Colors.white, '전체', '${vehicles.length}대'),
+                ],
+              ),
+            ]),
+          ),
+          const SizedBox(height: 16),
           if (vehicles.isEmpty)
-            Center(child: Padding(
-              padding: const EdgeInsets.only(top: 60),
-              child: Column(children: [
-                Icon(Icons.directions_car_outlined,
-                    size: 52, color: Colors.grey[300]),
-                const SizedBox(height: 12),
-                Text('등록된 차량이 없습니다',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 14)),
-              ]),
-            ))
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Column(children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: Icon(Icons.directions_car_outlined,
+                        size: 40, color: Colors.grey[300]),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('등록된 차량이 없습니다',
+                      style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            )
           else
             ...vehicles.map((v) => _vehicleCard(v)),
         ],
@@ -268,32 +442,22 @@ class _VehicleScreenState extends State<VehicleScreen>
     );
   }
 
-  Widget _summaryChip(IconData icon, Color color, String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8, offset: const Offset(0, 3))],
-      ),
-      child: Column(children: [
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10)),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(height: 6),
-        Text(value, style: TextStyle(
-            fontSize: 16, fontWeight: FontWeight.w900, color: color)),
-        Text(label, style: TextStyle(
-            fontSize: 10, color: Colors.black.withOpacity(0.4),
-            fontWeight: FontWeight.w600)),
-      ]),
-    );
+  Widget _summaryChip(
+      IconData icon, Color color, String label, String value) {
+    return Column(children: [
+      Icon(icon, color: color, size: 22),
+      const SizedBox(height: 5),
+      Text(value,
+          style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+              color: color)),
+      Text(label,
+          style: TextStyle(
+              fontSize: 10,
+              color: Colors.white.withOpacity(0.65),
+              fontWeight: FontWeight.w600)),
+    ]);
   }
 
   Widget _vehicleCard(_Vehicle v) {
@@ -304,83 +468,164 @@ class _VehicleScreenState extends State<VehicleScreen>
     final statusColor = isDriving ? Colors.orange : Colors.green;
     final statusLabel = isDriving ? '운행 중' : '사용 가능';
     final statusIcon  = isDriving
-        ? Icons.drive_eta_rounded : Icons.check_circle_rounded;
+        ? Icons.drive_eta_rounded
+        : Icons.check_circle_rounded;
+
+    final carIcon = _vehicleIcon(v.name);
 
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(
-          builder: (_) => VehicleLogHistoryScreen(
-            vehicle:     v,
-            userProfile: widget.userProfile,
-            isAdmin:     widget.isAdmin,
-            onRefresh:   _loadData,
-          ))),
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => VehicleLogHistoryScreen(
+                    vehicle:     v,
+                    userProfile: widget.userProfile,
+                    isAdmin:     widget.isAdmin,
+                    onRefresh:   _loadData,
+                  ))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: isDriving
-                  ? Colors.orange.withOpacity(0.3)
-                  : Colors.transparent),
-          boxShadow: [BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 12, offset: const Offset(0, 4))],
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: statusColor.withOpacity(isDriving ? 0.14 : 0.07),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(children: [
           Row(children: [
+            // 그라디언트 차량 아이콘
             Container(
-              width: 52, height: 52,
+              width: 56, height: 56,
               decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(_vehicleIcon(v.name), color: statusColor, size: 28),
+                gradient: LinearGradient(
+                  colors: isDriving
+                      ? [Colors.orange.shade300, Colors.orange.shade600]
+                      : [_teal, _tealDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: (isDriving ? Colors.orange : _teal)
+                        .withOpacity(0.30),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(carIcon, color: Colors.white, size: 28),
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text(v.name, style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w900,
-                    color: Color(0xFF1A1D2E))),
-                const SizedBox(height: 2),
-                Text(v.plateNumber, style: TextStyle(
-                    fontSize: 12, color: Colors.black.withOpacity(0.4),
-                    fontWeight: FontWeight.w600)),
+                Text(v.name,
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1A1D2E))),
+                const SizedBox(height: 3),
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(v.plateNumber,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.black.withOpacity(0.5),
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ]),
               ]),
             ),
+            // 상태 뱃지
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 11, vertical: 6),
               decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10)),
+                gradient: LinearGradient(
+                  colors: isDriving
+                      ? [Colors.orange.shade300, Colors.orange.shade500]
+                      : [Colors.green.shade300, Colors.green.shade500],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: statusColor.withOpacity(0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(statusIcon, color: statusColor, size: 12),
+                Icon(statusIcon, color: Colors.white, size: 12),
                 const SizedBox(width: 4),
-                Text(statusLabel, style: TextStyle(
-                    color: statusColor, fontSize: 12,
-                    fontWeight: FontWeight.w800)),
+                Text(statusLabel,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800)),
               ]),
             ),
           ]),
 
+          // 운행 중 정보
           if (isDriving) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.06),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.orange.withOpacity(0.06),
+                    Colors.orange.withOpacity(0.03),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: Colors.orange.withOpacity(0.2)),
               ),
               child: Row(children: [
-                const Icon(Icons.person_rounded, size: 14, color: Colors.orange),
-                const SizedBox(width: 6),
-                Text(v.currentLog!['full_name'] ?? '-',
-                    style: const TextStyle(fontSize: 13,
-                        fontWeight: FontWeight.w700, color: Colors.orange)),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person_rounded,
+                      size: 14, color: Colors.orange),
+                ),
                 const SizedBox(width: 8),
-                Container(width: 1, height: 12,
+                Text(v.currentLog!['full_name'] ?? '-',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.orange)),
+                const SizedBox(width: 8),
+                Container(
+                    width: 1,
+                    height: 12,
                     color: Colors.orange.withOpacity(0.3)),
                 const SizedBox(width: 8),
                 const Icon(Icons.arrow_forward_rounded,
@@ -388,8 +633,10 @@ class _VehicleScreenState extends State<VehicleScreen>
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    '${v.currentLog!['departure']} → ${v.currentLog!['destination']}',
-                    style: TextStyle(fontSize: 12,
+                    '${v.currentLog!['departure']} → '
+                    '${v.currentLog!['destination']}',
+                    style: TextStyle(
+                        fontSize: 12,
                         color: Colors.orange.withOpacity(0.8),
                         fontWeight: FontWeight.w600),
                     overflow: TextOverflow.ellipsis,
@@ -400,41 +647,90 @@ class _VehicleScreenState extends State<VehicleScreen>
           ],
 
           const SizedBox(height: 12),
+
+          // 액션 버튼
           if (!isDriving)
-            _actionBtn('출발 기록', Icons.play_arrow_rounded, Colors.green,
-                () => _showDepartureSheet(v))
+            _gradientActionBtn(
+              label: '출발 기록',
+              icon: Icons.play_arrow_rounded,
+              colors: [Colors.green.shade400, Colors.green.shade600],
+              shadowColor: Colors.green,
+              onTap: () => _showDepartureSheet(v),
+            )
           else if (isMyDriving)
-            _actionBtn('귀환 기록', Icons.flag_rounded, _primary,
-                () => _showReturnSheet(v))
+            _gradientActionBtn(
+              label: '귀환 기록',
+              icon: Icons.flag_rounded,
+              colors: [_teal, _tealDark],
+              shadowColor: _teal,
+              onTap: () => _showReturnSheet(v),
+            )
           else
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.07),
-                  borderRadius: BorderRadius.circular(12)),
-              child: const Center(
-                child: Text('다른 직원이 사용 중',
-                    style: TextStyle(fontSize: 13, color: Colors.grey,
-                        fontWeight: FontWeight.w600)),
+                color: Colors.black.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                Icon(Icons.lock_outline_rounded,
+                    size: 16, color: Colors.grey),
+                SizedBox(width: 6),
+                Text('다른 직원이 사용 중',
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w700)),
+              ]),
             ),
         ]),
       ),
     );
   }
 
-  Widget _actionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _gradientActionBtn({
+    required String label,
+    required IconData icon,
+    required List<Color> colors,
+    required Color shadowColor,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
-            color: color, borderRadius: BorderRadius.circular(12)),
+          gradient: LinearGradient(
+            colors: colors,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: shadowColor.withOpacity(0.30),
+              blurRadius: 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, color: Colors.white, size: 18),
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.22),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 16),
+          ),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(
-              color: Colors.white, fontSize: 14, fontWeight: FontWeight.w800)),
+          Text(label,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900)),
         ]),
       ),
     );
@@ -504,7 +800,7 @@ class _VehicleScreenState extends State<VehicleScreen>
         'status':        'DONE',
       }).eq('id', logId);
       await _loadData();
-      _snack('귀환 기록 완료! 수고하셨습니다 ✅', color: _primary);
+      _snack('귀환 기록 완료! 수고하셨습니다 ✅', color: _teal);
     } catch (e) {
       debugPrint('귀환 기록 실패: $e');
       _snack('오류가 발생했습니다.');
@@ -512,7 +808,9 @@ class _VehicleScreenState extends State<VehicleScreen>
   }
 
   IconData _vehicleIcon(String name) {
-    if (name.contains('톤') || name.contains('트럭') || name.contains('봉고')) {
+    if (name.contains('톤') ||
+        name.contains('트럭') ||
+        name.contains('봉고')) {
       return Icons.local_shipping_rounded;
     }
     if (name.contains('KONA') || name.contains('ELECTRIC')) {
