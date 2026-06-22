@@ -1,20 +1,47 @@
-<<<<<<< HEAD
-# sspaap
+# 승산팩 시스템 (SSP App)
 
-A new Flutter project.
+승산팩 제조 현장을 위한 **사내 업무 관리 시스템**입니다.
+Flutter 기반 PWA로 제작되어 웹·모바일에서 설치 없이 사용할 수 있습니다.
 
-## Getting Started
+> 🌐 배포 주소: [sspapp-71608.web.app](https://sspapp-71608.web.app)
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## 주요 기능
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- 🍽️ **식수 관리** — 중·석식 신청 및 식수 인원 집계
+- 🕒 **근태·휴가 관리** — 출퇴근 기록, 연차/반차/공가 등 휴가 신청 및 잔여 연차 자동 관리
+- 🏠 **기숙사 관리** — 신·구 기숙사 배정 및 호실 현황
+- 🚗 **차량 운행 일지** — 운행 기록, 운행 시간 표시, 주유 신청, 엑셀 내보내기
+- 👕 **작업복 신청** — 사이즈별 작업복 신청 및 처리 현황
+- 📢 **공지사항** — 공지 등록 및 푸시 알림 발송
+- 💳 **명함 스캔** — AI OCR을 활용한 명함 자동 인식 및 저장
+- 📊 **직원 분석** — 부서별·기간별 통계 및 현황 분석
+- 💬 **익명 건의함** — 익명 의견 제출
+- 🧹 **청소 당번** — 발코니·식당 청소 순번 관리
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-=======
-# SSP_APP
->>>>>>> 46cdd1b5905a48d02cdc81b3bde87a34f54f9ce6
+### 다국어 지원
+한국어 · 영어 · 베트남어 · 우즈베크어 · 크메르어 5개 언어를 지원합니다.
+
+---
+
+## 기술 스택
+
+| 구분 | 사용 기술 |
+|------|-----------|
+| **프론트엔드** | Flutter (Web / PWA) |
+| **백엔드** | Supabase (PostgreSQL, Auth, RLS, Edge Functions) |
+| **푸시 알림** | OneSignal, FCM |
+| **AI / OCR** | Claude Vision (명함 인식) |
+| **호스팅** | Firebase Hosting |
+
+---
+
+## 개발 정보
+
+- 👤 **개발**: 단독 개발 (1인 개발)
+- 📅 **개발 기간**: 2025년 1월 ~ 현재 (지속적으로 업데이트 중)
+
+---
+
+© 2025 승산팩 시스템. All rights reserved.
