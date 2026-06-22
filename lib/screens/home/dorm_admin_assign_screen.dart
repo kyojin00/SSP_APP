@@ -35,10 +35,12 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
   Future<void> _fetchRooms() async {
     try {
       final data = await supabase.from('dorm_rooms').select('*').order('room_number');
-      setState(() {
-        _rooms = List<Map<String, dynamic>>.from(data);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _rooms     = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       debugPrint("방 목록 로드 실패: $e");
     }
@@ -51,48 +53,69 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
           .select('*')
           .eq('status', 'PENDING')
           .order('created_at', ascending: false);
-      setState(() {
-        _pendingApplications = List<Map<String, dynamic>>.from(data);
-      });
+      if (mounted) {
+        setState(() {
+          _pendingApplications = List<Map<String, dynamic>>.from(data);
+        });
+      }
     } catch (e) {
       debugPrint("신청 목록 로드 실패: $e");
     }
   }
 
-  Future<void> _updateOccupancy(String roomId, int current, int delta, int max) async {
+  Future<void> _updateOccupancy(
+      String roomId, int current, int delta, int max) async {
     final newValue = current + delta;
     if (newValue < 0 || newValue > max) return;
     try {
-      await supabase.from('dorm_rooms').update({'current_occupancy': newValue}).eq('id', roomId);
+      await supabase
+          .from('dorm_rooms')
+          .update({'current_occupancy': newValue})
+          .eq('id', roomId);
       _fetchRooms();
     } catch (e) {
       _showSnack("인원수 업데이트 중 오류가 발생했습니다.");
     }
   }
 
-  Future<void> _handleApplication(Map<String, dynamic> app, String status) async {
+  Future<void> _handleApplication(
+      Map<String, dynamic> app, String status) async {
     try {
-      await supabase.from('dorm_applications').update({'status': status}).eq('id', app['id']);
+      await supabase
+          .from('dorm_applications')
+          .update({'status': status})
+          .eq('id', app['id']);
 
       if (status == 'APPROVED') {
-        final cleanNum = app['room_number'].toString().replaceAll('호', '').trim();
+        final cleanNum =
+            app['room_number'].toString().replaceAll('호', '').trim();
         final room = _rooms.firstWhere(
-          (r) => r['room_number'].toString().replaceAll('호', '').trim() == cleanNum,
-          orElse: () => throw Exception("방 번호 [$cleanNum]를 찾을 수 없습니다."),
+          (r) =>
+              r['room_number'].toString().replaceAll('호', '').trim() ==
+              cleanNum,
+          orElse: () =>
+              throw Exception("방 번호 [$cleanNum]를 찾을 수 없습니다."),
         );
         final roomId       = room['id'].toString();
         final targetUserId = app['user_id'];
 
         if (app['type'] == 'IN') {
           await supabase.from('dorm_residents').insert({
-            'room_id': roomId,
+            'room_id':       roomId,
             'resident_name': app['full_name'],
-            'user_id': targetUserId,
+            'user_id':       targetUserId,
           });
-          await _updateOccupancy(roomId, room['current_occupancy'], 1, room['max_capacity']);
+          await _updateOccupancy(
+              roomId, room['current_occupancy'] as int, 1,
+              room['max_capacity'] as int);
         } else {
-          await supabase.from('dorm_residents').delete().eq('user_id', targetUserId);
-          await _updateOccupancy(roomId, room['current_occupancy'], -1, room['max_capacity']);
+          await supabase
+              .from('dorm_residents')
+              .delete()
+              .eq('user_id', targetUserId);
+          await _updateOccupancy(
+              roomId, room['current_occupancy'] as int, -1,
+              room['max_capacity'] as int);
         }
       }
 
@@ -109,9 +132,9 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ResidentManagerSheet(
-        room: room,
-        supabase: supabase,
-        onSnack: _showSnack,
+        room:      room,
+        supabase:  supabase,
+        onSnack:   _showSnack,
         onRefresh: _refreshData,
       ),
     );
@@ -129,8 +152,10 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
   @override
   Widget build(BuildContext context) {
     final totalRooms     = _rooms.length;
-    final totalResidents = _rooms.fold<int>(0, (s, r) => s + ((r['current_occupancy'] as int?) ?? 0));
-    final totalCapacity  = _rooms.fold<int>(0, (s, r) => s + ((r['max_capacity'] as int?) ?? 0));
+    final totalResidents = _rooms.fold<int>(
+        0, (s, r) => s + ((r['current_occupancy'] as int?) ?? 0));
+    final totalCapacity  = _rooms.fold<int>(
+        0, (s, r) => s + ((r['max_capacity'] as int?) ?? 0));
 
     return Scaffold(
       backgroundColor: _bg,
@@ -147,7 +172,9 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
           child: Container(height: 1, color: const Color(0xFFF0F2F8)),
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _refreshData),
+          IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: _refreshData),
         ],
       ),
       body: _isLoading
@@ -161,7 +188,8 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
                   _buildSummaryCard(totalRooms, totalResidents, totalCapacity),
                   const SizedBox(height: 20),
                   if (_pendingApplications.isNotEmpty) ...[
-                    _sectionHeader("승인 대기", "${_pendingApplications.length}건",
+                    _sectionHeader("승인 대기",
+                        "${_pendingApplications.length}건",
                         _orange, Icons.notifications_active_rounded),
                     const SizedBox(height: 10),
                     ..._pendingApplications.map(_buildApplicationCard),
@@ -184,55 +212,96 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF2E6BFF), Color(0xFF4FB2FF)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: _primary.withOpacity(0.25),
-            blurRadius: 16, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+              color: _primary.withOpacity(0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6))
+        ],
       ),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
           _statItem("전체 호실", "$rooms개"),
-          Container(width: 1, height: 32, color: Colors.white.withOpacity(0.2)),
+          Container(
+              width: 1,
+              height: 32,
+              color: Colors.white.withOpacity(0.2)),
           _statItem("거주 인원", "$residents명"),
-          Container(width: 1, height: 32, color: Colors.white.withOpacity(0.2)),
+          Container(
+              width: 1,
+              height: 32,
+              color: Colors.white.withOpacity(0.2)),
           _statItem("잔여 공석", "${capacity - residents}석"),
         ]),
         const SizedBox(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text("입실률  ${(rate * 100).toStringAsFixed(0)}%",
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
           Text("$residents / $capacity명",
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
         ]),
         const SizedBox(height: 6),
-        ClipRRect(borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: rate.clamp(0.0, 1.0),
-                minHeight: 6, backgroundColor: Colors.white.withOpacity(0.2),
-                valueColor: const AlwaysStoppedAnimation(Colors.white))),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: rate.clamp(0.0, 1.0),
+            minHeight: 6,
+            backgroundColor: Colors.white.withOpacity(0.2),
+            valueColor: const AlwaysStoppedAnimation(Colors.white),
+          ),
+        ),
       ]),
     );
   }
 
   Widget _statItem(String label, String value) => Column(children: [
-    Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
-    const SizedBox(height: 3),
-    Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
-  ]);
+        Text(value,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w900)),
+        const SizedBox(height: 3),
+        Text(label,
+            style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w600)),
+      ]);
 
-  Widget _sectionHeader(String title, String badge, Color color, IconData icon) {
+  Widget _sectionHeader(
+      String title, String badge, Color color, IconData icon) {
     return Row(children: [
-      Container(padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(color: color.withOpacity(0.1),
+      Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10)),
           child: Icon(icon, color: color, size: 16)),
       const SizedBox(width: 10),
-      Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: _text)),
+      Text(title,
+          style: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w900, color: _text)),
       const SizedBox(width: 8),
-      Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-          decoration: BoxDecoration(color: color.withOpacity(0.1),
+      Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8)),
-          child: Text(badge, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color))),
+          child: Text(badge,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: color))),
     ]);
   }
 
@@ -246,41 +315,64 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: _orange.withOpacity(0.2)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Row(children: [
-        Container(width: 42, height: 42,
-            decoration: BoxDecoration(color: color.withOpacity(0.08),
+        Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+                color: color.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color, size: 20)),
         const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Text(app['full_name'] ?? '-',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _text)),
-            const SizedBox(width: 6),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(5)),
-                child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color))),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(app['full_name'] ?? '-',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: _text)),
+              const SizedBox(width: 6),
+              Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(5)),
+                  child: Text(label,
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: color))),
+            ]),
+            const SizedBox(height: 3),
+            Text("${app['room_number']}호 $label 요청",
+                style: const TextStyle(fontSize: 12, color: _sub)),
           ]),
-          const SizedBox(height: 3),
-          Text("${app['room_number']}호 $label 요청",
-              style: const TextStyle(fontSize: 12, color: _sub)),
-        ])),
+        ),
         Row(mainAxisSize: MainAxisSize.min, children: [
           _actionChip("반려", _red, () => _handleApplication(app, 'REJECTED')),
           const SizedBox(width: 6),
-          _actionChip("승인", _green, () => _handleApplication(app, 'APPROVED'), filled: true),
+          _actionChip("승인", _green,
+              () => _handleApplication(app, 'APPROVED'),
+              filled: true),
         ]),
       ]),
     );
   }
 
-  Widget _actionChip(String label, Color color, VoidCallback onTap, {bool filled = false}) {
+  Widget _actionChip(String label, Color color, VoidCallback onTap,
+      {bool filled = false}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -290,94 +382,110 @@ class _DormAdminAssignScreenState extends State<DormAdminAssignScreen> {
           borderRadius: BorderRadius.circular(10),
           border: filled ? null : Border.all(color: color.withOpacity(0.3)),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800,
-            color: filled ? Colors.white : color)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: filled ? Colors.white : color)),
       ),
     );
   }
 
   Widget _buildRoomCard(Map<String, dynamic> room) {
-    final id      = room['id'].toString();
     final roomNum = room['room_number'].toString();
-    final current = int.tryParse(room['current_occupancy'].toString()) ?? 0;
-    final max     = int.tryParse(room['max_capacity'].toString()) ?? 0;
+    final current = (room['current_occupancy'] as int?) ?? 0;
+    final max     = (room['max_capacity'] as int?) ?? 0;
     final rate    = max > 0 ? current / max : 0.0;
     final isFull  = current >= max;
-    final isEmpty = current == 0;
-    final barColor = isFull ? _red : rate >= 0.5 ? _orange : _green;
+    final barColor =
+        isFull ? _red : rate >= 0.5 ? _orange : _green;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 3))],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Column(children: [
         Row(children: [
-          Container(width: 48, height: 48,
-              decoration: BoxDecoration(
-                  color: isFull ? _red.withOpacity(0.08) : _primary.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(Icons.meeting_room_rounded,
-                  color: isFull ? _red : _primary, size: 22)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Text(roomNum, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _text)),
-              const SizedBox(width: 8),
-              if (isFull) _badge("만실", _red) else if (isEmpty) _badge("공실", _sub),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+                color: isFull
+                    ? _red.withOpacity(0.08)
+                    : _primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14)),
+            child: Icon(Icons.meeting_room_rounded,
+                color: isFull ? _red : _primary, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Text(roomNum,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: _text)),
+              const SizedBox(height: 3),
+              Text("$current / $max명",
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: isFull ? _red : _sub,
+                      fontWeight: FontWeight.w600)),
             ]),
-            const SizedBox(height: 3),
-            Text("$current / $max명 거주 중",
-                style: const TextStyle(fontSize: 12, color: _sub)),
-          ])),
+          ),
+          if (isFull)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                  color: _red.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Text("만실",
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: _red)),
+            ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showResidentManager(room),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                  color: _primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: const [
+                Icon(Icons.people_rounded, color: _primary, size: 14),
+                SizedBox(width: 4),
+                Text("거주자 명단",
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _primary)),
+              ]),
+            ),
+          ),
         ]),
         const SizedBox(height: 12),
-        ClipRRect(borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(value: rate.clamp(0.0, 1.0),
-                minHeight: 5, backgroundColor: Colors.black.withOpacity(0.05),
-                valueColor: AlwaysStoppedAnimation(barColor))),
-        const SizedBox(height: 10),
-        GestureDetector(
-          onTap: () => _showResidentManager(room),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 9),
-            decoration: BoxDecoration(
-                color: _primary.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _primary.withOpacity(0.15))),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              const Icon(Icons.people_rounded, color: _primary, size: 15),
-              const SizedBox(width: 6),
-              const Text("거주자 명단",
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _primary)),
-            ]),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: rate.clamp(0.0, 1.0),
+            minHeight: 5,
+            backgroundColor: Colors.grey.withOpacity(0.1),
+            valueColor: AlwaysStoppedAnimation(barColor),
           ),
         ),
       ]),
-    );
-  }
-
-  Widget _badge(String label, Color color) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-    child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: color)),
-  );
-
-  Widget _roundBtn(IconData icon, Color color, VoidCallback? onTap) {
-    final disabled = onTap == null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32, height: 32,
-        decoration: BoxDecoration(
-            color: disabled ? Colors.grey.withOpacity(0.08) : color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(9)),
-        child: Icon(icon, size: 16, color: disabled ? Colors.grey[300] : color),
-      ),
     );
   }
 }
@@ -417,8 +525,8 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
 
   String get _roomId     => widget.room['id'].toString();
   String get _roomNumber => widget.room['room_number'].toString();
-  int    get _current    => int.tryParse(widget.room['current_occupancy'].toString()) ?? 0;
-  int    get _max        => int.tryParse(widget.room['max_capacity'].toString()) ?? 0;
+  // ✅ _max만 widget.room에서 읽음 (변하지 않는 값)
+  int    get _max        => (widget.room['max_capacity'] as int?) ?? 0;
 
   @override
   void initState() {
@@ -433,12 +541,14 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
           .from('dorm_residents')
           .select('*')
           .eq('room_id', _roomId);
-      setState(() {
-        _residents = List<Map<String, dynamic>>.from(data);
-        _loading   = false;
-      });
+      if (mounted) {
+        setState(() {
+          _residents = List<Map<String, dynamic>>.from(data);
+          _loading   = false;
+        });
+      }
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -471,21 +581,25 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18)),
           title: Text("$_roomNumber 거주자 추가",
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900, fontSize: 16)),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // 앱 계정 선택
               if (profiles.isNotEmpty)
                 DropdownButtonFormField<String>(
                   value: selectedUserId,
-                  hint: const Text('앱 계정 선택 (선택사항)', style: TextStyle(fontSize: 13)),
+                  hint: const Text('앱 계정 선택 (선택사항)',
+                      style: TextStyle(fontSize: 13)),
                   isExpanded: true,
                   items: profiles.map((p) {
-                    final name = p['full_name'] as String? ?? '-';
-                    final dept = _deptLabel(p['dept_category'] as String? ?? '');
+                    final name =
+                        p['full_name'] as String? ?? '-';
+                    final dept =
+                        _deptLabel(p['dept_category'] as String? ?? '');
                     return DropdownMenuItem(
                       value: p['id'] as String,
                       child: Text('$name  ·  $dept',
@@ -495,26 +609,30 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
                   onChanged: (v) {
                     setS(() {
                       selectedUserId = v;
-                      // 선택 시 이름 자동 입력
-                      final profile = profiles.firstWhere((p) => p['id'] == v);
-                      nameCtrl.text = profile['full_name'] as String? ?? '';
+                      final profile = profiles
+                          .firstWhere((p) => p['id'] == v);
+                      nameCtrl.text =
+                          profile['full_name'] as String? ?? '';
                     });
                   },
                   decoration: InputDecoration(
                     labelText: '직원 선택',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                   ),
                 ),
               const SizedBox(height: 12),
-              // 이름 직접 입력 (앱 계정 없는 외국인 등)
               TextField(
                 controller: nameCtrl,
                 decoration: InputDecoration(
                   labelText: '이름',
                   hintText: '직접 입력 (앱 계정 없는 경우)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
                 ),
               ),
             ]),
@@ -527,33 +645,34 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
               style: ElevatedButton.styleFrom(
                   backgroundColor: _primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
               onPressed: () async {
                 final name = nameCtrl.text.trim();
                 if (name.isEmpty) return;
-
                 try {
                   // 입주자 추가
                   await widget.supabase.from('dorm_residents').insert({
-                    'room_id':       _roomId,
-                    'room_number':   _roomNumber,
-                    'resident_name': name,
+                    'room_id':         _roomId,
+                    'room_number':     _roomNumber,
+                    'resident_name':   name,
                     if (selectedUserId != null) 'user_id': selectedUserId,
-                    'entry_date':    DateTime.now().toIso8601String().substring(0, 10),
-                    'deposit_amount': '0',
+                    'entry_date':
+                        DateTime.now().toIso8601String().substring(0, 10),
+                    'deposit_amount':  '0',
                     'agreed_to_rules': 'false',
                   });
 
-                  // 호실 인원 +1
-                  final newOccupancy = _current + 1;
+                  // ✅ DB에서 실제 인원수 조회 후 +1 (stale 값 방지)
+                  final currentCount = await _getActualCount();
                   await widget.supabase
                       .from('dorm_rooms')
-                      .update({'current_occupancy': newOccupancy})
+                      .update({'current_occupancy': currentCount})
                       .eq('id', _roomId);
 
-                  Navigator.pop(ctx);
+                  if (mounted) Navigator.pop(ctx);
                   widget.onSnack('$name 거주자 추가 완료 ✅');
-                  widget.onRefresh(); // 상위 호실 목록 갱신
+                  widget.onRefresh();
                   _loadResidents();
                 } catch (e) {
                   widget.onSnack('추가 실패: $e');
@@ -567,20 +686,36 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
     );
   }
 
-  // ── 거주자 삭제
+  // ✅ DB에서 실제 dorm_residents 수를 조회해서 반환
+  Future<int> _getActualCount() async {
+    final data = await widget.supabase
+        .from('dorm_residents')
+        .select('id')
+        .eq('room_id', _roomId);
+    return (data as List).length;
+  }
+
+  // ── 거주자 퇴실
   Future<void> _removeResident(Map<String, dynamic> resident) async {
     final name = resident['resident_name'] as String? ?? '-';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('거주자 퇴실', style: TextStyle(fontWeight: FontWeight.w900)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18)),
+        title: const Text('거주자 퇴실',
+            style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text('$name 거주자를\n퇴실 처리하시겠습니까?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('퇴실'),
           ),
@@ -590,12 +725,16 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
     if (confirmed != true) return;
 
     try {
-      await widget.supabase.from('dorm_residents').delete().eq('id', resident['id']);
-      // 호실 인원 -1
-      final newOccupancy = (_current - 1).clamp(0, _max);
+      await widget.supabase
+          .from('dorm_residents')
+          .delete()
+          .eq('id', resident['id']);
+
+      // ✅ 삭제 후 실제 DB 카운트로 업데이트
+      final currentCount = await _getActualCount();
       await widget.supabase
           .from('dorm_rooms')
-          .update({'current_occupancy': newOccupancy})
+          .update({'current_occupancy': currentCount})
           .eq('id', _roomId);
 
       widget.onSnack('$name 퇴실 처리 완료');
@@ -619,14 +758,21 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text("벌점 삭제", style: TextStyle(fontWeight: FontWeight.w900)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18)),
+        title: const Text("벌점 삭제",
+            style: TextStyle(fontWeight: FontWeight.w900)),
         content: Text("$userName 사원의 벌점을\n삭제하시겠습니까?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("취소")),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("취소")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _red, foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: _red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10))),
             onPressed: () => Navigator.pop(context, true),
             child: const Text("삭제"),
           ),
@@ -636,7 +782,10 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
     if (confirmed != true) return;
 
     try {
-      await widget.supabase.from('dorm_demerits').delete().eq('id', demeritId);
+      await widget.supabase
+          .from('dorm_demerits')
+          .delete()
+          .eq('id', demeritId);
       widget.onSnack("벌점이 삭제되었습니다. ✅");
       setState(() => _refreshKey++);
     } catch (e) {
@@ -652,38 +801,52 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18)),
           title: Text("$userName 벌점 부여",
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900, fontSize: 16)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             DropdownButtonFormField<int>(
               value: points,
-              items: [1, 2, 3].map((p) => DropdownMenuItem(value: p, child: Text("$p 점"))).toList(),
+              items: [1, 2, 3]
+                  .map((p) =>
+                      DropdownMenuItem(value: p, child: Text("$p 점")))
+                  .toList(),
               onChanged: (v) => setS(() => points = v!),
               decoration: const InputDecoration(labelText: "벌점 점수"),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: reasonCtrl,
-              decoration: const InputDecoration(labelText: "사유", hintText: "예: 실내 흡연, 소음 등"),
+              decoration: const InputDecoration(
+                  labelText: "사유",
+                  hintText: "예: 실내 흡연, 소음 등"),
             ),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("취소")),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("취소")),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10))),
               onPressed: () async {
                 if (reasonCtrl.text.trim().isEmpty) return;
                 await widget.supabase.from('dorm_demerits').insert({
-                  'user_id': userId,
+                  'user_id':       userId,
                   'resident_name': userName,
-                  'points': points,
-                  'reason': reasonCtrl.text.trim(),
-                  'given_by': widget.supabase.auth.currentUser!.id,
+                  'points':        points,
+                  'reason':        reasonCtrl.text.trim(),
+                  'given_by':
+                      widget.supabase.auth.currentUser!.id,
                 });
                 Navigator.pop(ctx);
-                widget.onSnack("$userName 사원에게 벌점 $points점 부과 ✅");
+                widget.onSnack(
+                    "$userName 사원에게 벌점 $points점 부과 ✅");
                 setState(() => _refreshKey++);
               },
               child: const Text("부과"),
@@ -696,10 +859,16 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
 
   String _deptLabel(String dept) {
     const m = {
-      'MANAGEMENT': '관리부', 'PRODUCTION': '생산관리부', 'SALES': '영업부',
-      'RND': '연구소', 'STEEL': '스틸생산부', 'BOX': '박스생산부',
-      'DELIVERY': '포장납품부', 'SSG': '에스에스지',
-      'CLEANING': '환경미화', 'NUTRITION': '영양사',
+      'MANAGEMENT': '관리부',
+      'PRODUCTION': '생산관리부',
+      'SALES':      '영업부',
+      'RND':        '연구소',
+      'STEEL':      '스틸생산부',
+      'BOX':        '박스생산부',
+      'DELIVERY':   '포장납품부',
+      'SSG':        '에스에스지',
+      'CLEANING':   '환경미화',
+      'NUTRITION':  '영양사',
     };
     return m[dept] ?? dept;
   }
@@ -707,41 +876,65 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.9),
+      constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9),
       decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       child: Column(children: [
-        Container(width: 40, height: 4,
+        Container(
+            width: 40,
+            height: 4,
             margin: const EdgeInsets.symmetric(vertical: 14),
-            decoration: BoxDecoration(color: Colors.grey[300],
+            decoration: BoxDecoration(
+                color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2))),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 0, 16, 12),
           child: Row(children: [
-            const Icon(Icons.meeting_room_rounded, color: _primary, size: 20),
+            const Icon(Icons.meeting_room_rounded,
+                color: _primary, size: 20),
             const SizedBox(width: 8),
             Text("$_roomNumber 거주자 명단",
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: _text)),
+                style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: _text)),
             const Spacer(),
             if (!_loading)
               Text("${_residents.length}/$_max명",
-                  style: const TextStyle(fontSize: 13, color: _sub, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: _sub,
+                      fontWeight: FontWeight.w600)),
             const SizedBox(width: 10),
-            // ── 추가 버튼
+            // ✅ 추가 버튼: _residents.length 기반으로 활성화 판단
             GestureDetector(
-              onTap: _current < _max ? _showAddResidentDialog : null,
+              onTap: _residents.length < _max
+                  ? _showAddResidentDialog
+                  : null,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                    color: _current < _max ? _primary : Colors.grey.withOpacity(0.1),
+                    color: _residents.length < _max
+                        ? _primary
+                        : Colors.grey.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.person_add_rounded, size: 14,
-                      color: _current < _max ? Colors.white : Colors.grey[400]),
+                  Icon(Icons.person_add_rounded,
+                      size: 14,
+                      color: _residents.length < _max
+                          ? Colors.white
+                          : Colors.grey[400]),
                   const SizedBox(width: 4),
-                  Text('추가', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800,
-                      color: _current < _max ? Colors.white : Colors.grey[400])),
+                  Text('추가',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: _residents.length < _max
+                              ? Colors.white
+                              : Colors.grey[400])),
                 ]),
               ),
             ),
@@ -750,35 +943,53 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
         const Divider(height: 1),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(color: _primary))
+              ? const Center(
+                  child: CircularProgressIndicator(color: _primary))
               : _residents.isEmpty
-                  ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.person_off_rounded, size: 48, color: Colors.grey[300]),
-                      const SizedBox(height: 10),
-                      Text("거주자가 없습니다.",
-                          style: TextStyle(color: Colors.grey[400])),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: _showAddResidentDialog,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          decoration: BoxDecoration(
-                              color: _primary.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: _primary.withOpacity(0.2))),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                            Icon(Icons.person_add_rounded, color: _primary, size: 16),
-                            SizedBox(width: 6),
-                            Text('첫 거주자 추가', style: TextStyle(
-                                color: _primary, fontWeight: FontWeight.w700)),
-                          ]),
-                        ),
-                      ),
-                    ]))
+                  ? Center(
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                          Icon(Icons.person_off_rounded,
+                              size: 48, color: Colors.grey[300]),
+                          const SizedBox(height: 10),
+                          Text("거주자가 없습니다.",
+                              style:
+                                  TextStyle(color: Colors.grey[400])),
+                          const SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: _showAddResidentDialog,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 10),
+                              decoration: BoxDecoration(
+                                  color: _primary.withOpacity(0.08),
+                                  borderRadius:
+                                      BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color:
+                                          _primary.withOpacity(0.2))),
+                              child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.person_add_rounded,
+                                        color: _primary, size: 16),
+                                    SizedBox(width: 6),
+                                    Text('첫 거주자 추가',
+                                        style: TextStyle(
+                                            color: _primary,
+                                            fontWeight:
+                                                FontWeight.w700)),
+                                  ]),
+                            ),
+                          ),
+                        ]))
                   : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      padding:
+                          const EdgeInsets.fromLTRB(16, 12, 16, 24),
                       itemCount: _residents.length,
-                      itemBuilder: (_, i) => _buildResidentTile(_residents[i]),
+                      itemBuilder: (_, i) =>
+                          _buildResidentTile(_residents[i]),
                     ),
         ),
       ]),
@@ -792,27 +1003,44 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+          color: _bg, borderRadius: BorderRadius.circular(14)),
       child: Column(children: [
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           leading: Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: _primary.withOpacity(0.1),
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: _primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12)),
-            child: Center(child: Text(name.isNotEmpty ? name[0] : '?',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: _primary))),
+            child: Center(
+                child: Text(
+                    name.isNotEmpty ? name[0] : '?',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: _primary))),
           ),
-          title: Text(name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: _text)),
+          title: Text(name,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  color: _text)),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            // 퇴실 버튼
-            _tileBtn("퇴실", Colors.orange, () => _removeResident(person)),
+            _tileBtn("퇴실", Colors.orange,
+                () => _removeResident(person)),
             const SizedBox(width: 6),
             if (userId.isNotEmpty) ...[
-              _tileBtn("벌점 부여", _red, () => _addDemerit(userId, name)),
+              _tileBtn("벌점 부여", _red,
+                  () => _addDemerit(userId, name)),
               const SizedBox(width: 6),
-              _tileBtn(isExp ? "접기" : "벌점 보기", _primary,
-                  () => setState(() => _expandedUserId = isExp ? null : userId)),
+              _tileBtn(
+                  isExp ? "접기" : "벌점 보기",
+                  _primary,
+                  () => setState(() =>
+                      _expandedUserId = isExp ? null : userId)),
             ],
           ]),
         ),
@@ -822,49 +1050,81 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
             future: _fetchDemerits(userId),
             builder: (_, snap) {
               if (!snap.hasData) {
-                return const Padding(padding: EdgeInsets.all(12),
-                    child: Center(child: CircularProgressIndicator(color: _primary, strokeWidth: 2)));
+                return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(
+                        child: CircularProgressIndicator(
+                            color: _primary, strokeWidth: 2)));
               }
               final demerits = snap.data!;
               if (demerits.isEmpty) {
-                return Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                return Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(14, 0, 14, 12),
                     child: Text("부과된 벌점이 없습니다.",
-                        style: TextStyle(fontSize: 12, color: _sub.withOpacity(0.7))));
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: _sub.withOpacity(0.7))));
               }
-              return Column(children: demerits.map((d) {
+              return Column(
+                  children: demerits.map((d) {
                 final demeritId = d['id']?.toString() ?? '';
                 final points    = d['points'] ?? 0;
                 final reason    = d['reason'] ?? '-';
                 final createdAt = d['created_at'] != null
-                    ? DateTime.parse(d['created_at']).toLocal() : null;
+                    ? DateTime.parse(d['created_at']).toLocal()
+                    : null;
                 final dateStr = createdAt != null
-                    ? "${createdAt.month}/${createdAt.day}" : '';
+                    ? "${createdAt.month}/${createdAt.day}"
+                    : '';
 
                 return Container(
                   margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(color: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _red.withOpacity(0.15))),
+                      border: Border.all(
+                          color: _red.withOpacity(0.15))),
                   child: Row(children: [
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(color: _red.withOpacity(0.1),
+                    Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                            color: _red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6)),
                         child: Text("-$points점",
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: _red))),
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _red))),
                     const SizedBox(width: 10),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(reason, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                      if (dateStr.isNotEmpty)
-                        Text(dateStr, style: const TextStyle(fontSize: 11, color: _sub)),
-                    ])),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                          Text(reason,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                          if (dateStr.isNotEmpty)
+                            Text(dateStr,
+                                style: const TextStyle(
+                                    fontSize: 11, color: _sub)),
+                        ])),
                     GestureDetector(
                       onTap: () => _deleteDemerit(demeritId, name),
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: _red.withOpacity(0.08),
+                        decoration: BoxDecoration(
+                            color: _red.withOpacity(0.08),
                             borderRadius: BorderRadius.circular(8)),
-                        child: const Icon(Icons.delete_outline_rounded, color: _red, size: 16),
+                        child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: _red,
+                            size: 16),
                       ),
                     ),
                   ]),
@@ -880,10 +1140,16 @@ class _ResidentManagerSheetState extends State<_ResidentManagerSheet> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(color: color.withOpacity(0.08),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8)),
-        child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color)),
       ),
     );
   }

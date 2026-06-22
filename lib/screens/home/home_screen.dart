@@ -195,7 +195,9 @@ class _HomeScreenState extends State<HomeScreen>
       }
       if (isManager) {
         futures.add(supabase.from('leave_requests')
-            .select('id').eq('step1_status', 'PENDING'));
+            .select('id')
+            .eq('status', 'PENDING')       // ← 추가
+            .eq('step1_status', 'PENDING'));
       }
       if (isAdmin) {
         futures.add(supabase.from('uniform_requests')

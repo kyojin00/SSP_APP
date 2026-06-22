@@ -393,4 +393,27 @@ class AppStrings {
     'ko': '개 호실', 'en': ' rooms',
     'vi': ' phòng', 'uz': ' xona', 'km': ' បន្ទប់',
   };
+  // ── 출퇴근 리포트 카테고리
+  static const catAttendanceReport     = {'ko': '출퇴근 리포트',          'en': 'Attendance Report',    'vi': 'Bao cao cham cong',         'uz': 'Davomat hisoboti',          'km': 'របាយការណ៍វត្តមាន'};
+  static const catAttendanceReportDesc = {'ko': '근무중 · 퇴근 · 휴가 · 미출근', 'en': 'Working · Off · Leave · Absent', 'vi': 'Dang lam · Ve · Nghi · Vang', 'uz': 'Ishda · Ketdi · Ta\'til · Yo\'q', 'km': 'កំពុងធ្វើការ · ចេញ · ឈប់ · អវត្តមាន'};
+  static const attendanceRecord        = {'ko': '출퇴근 기록',             'en': 'My Attendance',        'vi': 'Cham cong cua toi',         'uz': 'Mening davomatim',          'km': 'វត្តមានរបស់ខ្ញុំ'};
+  static const attendanceStatus        = {'ko': '출퇴근 현황',             'en': 'Attendance Status',    'vi': 'Trang thai cham cong',      'uz': 'Davomat holati',            'km': 'ស្ថានភាពវត្តមាន'};
+
+  // ── 휴가 리포트 카테고리
+  static const catLeaveReport          = {'ko': '휴가 리포트',             'en': 'Leave Report',         'vi': 'Bao cao nghi phep',         'uz': 'Ta\'til hisoboti',          'km': 'របាយការណ៍休假'};
+  static const catLeaveReportDesc      = {'ko': '실시간 현황 · 연차기록',  'en': 'Live Status · History', 'vi': 'Trang thai · Lich su',      'uz': 'Jonli holat · Tarix',       'km': 'ស្ថានភាពផ្ទាល់ · ប្រវត្តិ'};
+  static const leaveHistoryRecord      = {'ko': '연차 기록',               'en': 'Leave History',        'vi': 'Lich su nghi phep',         'uz': 'Ta\'til tarixi',            'km': 'ប្រវត្តិ휴假'};
+
+  static const dormRoomMap   = {'ko': '호실 배치도', 'en': 'Room Map',       'vi': 'So do phong',    'uz': 'Xona sxemasi',   'km': 'ផែនទីបន្ទប់'};
+  static const balconyCleaning = {'ko': '베란다 청소', 'en': 'Balcony Cleaning', 'vi': 'Don dep ban cong', 'uz': 'Balkon tozalash', 'km': 'សំអាតរនោះ'};
+
+  // ── 식당 청소
+  static const cleaningTabCafeteria     = {'ko': '식당 청소',          'en': 'Cafeteria Cleaning',   'vi': 'Don phong an',        'uz': 'Oshxona tozalash',    'km': 'សម្អាតបន្ទប់ម្ហូប'};
+  static const cleaningCafeteriaTitle   = {'ko': '식당 청소 담당',      'en': 'Cafeteria Cleaners',   'vi': 'Phu trach don phong an', 'uz': 'Oshxona tozalovchilar', 'km': 'អ្នកទទួលខុសត្រូវបន្ទប់ម្ហូប'};
+  static const cleaningCafeteriaDesc    = {'ko': '고정 담당 (매주 동일)', 'en': 'Fixed duty (weekly)',  'vi': 'Co dinh hang tuan',   'uz': 'Har hafta bir xil',   'km': 'ថេរ (ប្រចាំសប្ដាហ៍)'};
+  static const cleaningCafeteriaEmpty   = {'ko': '지정된 담당자가 없습니다.', 'en': 'No cleaners assigned.', 'vi': 'Chua co phan cong.', 'uz': 'Tayinlanmagan.',      'km': 'គ្មានអ្នកត្រូវបានចាត់តាំង។'};
+  static const cleaningCafeteriaChange  = {'ko': '담당자 변경',          'en': 'Change Cleaners',      'vi': 'Doi nguoi phu trach', 'uz': 'Tozalovchini o\'zgartirish', 'km': 'ផ្លាស់ប្ដូរអ្នកទទួលខុសត្រូវ'};
+  static const cleaningCafeteriaExclude = {'ko': '베란다 청소 순번 제외됨', 'en': 'Excluded from balcony rotation', 'vi': 'Khong trong lich don ban cong', 'uz': 'Balkon navbatidan chiqarilgan', 'km': 'មិនរាប់បញ្ចូលក្នុងវេនរបង'};
+  static const cleaningPhotoWaiting  = {'ko': '사진 대기', 'en': 'Photo uploaded', 'vi': 'Anh da tai', 'uz': 'Rasm yuklangan', 'km': 'រូបថតបានបញ្ចូល'};
+  static const cleaningPhotoReupload = {'ko': '사진 재등록', 'en': 'Re-upload Photo', 'vi': 'Tai lai anh', 'uz': 'Rasmni qayta yuklash', 'km': 'បញ្ចូលរូបថតម្ដងទៀត'};
 }

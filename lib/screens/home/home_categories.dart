@@ -28,6 +28,14 @@ class _QuickActionDef {
 
 extension HomeScreenCategories on _HomeScreenState {
 
+  // ── 화면 이동 후 배지 새로고침 헬퍼 ──
+  Future<void> _pushAndRefresh(Widget screen) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    );
+    _loadBannerData();
+  }
+
   // ── 이 유저가 사용 가능한 퀵액션 전체 목록 ──
   List<_QuickActionDef> _availableQuickActions(
       bool isAdmin, bool isNutrition, String myDept) {
@@ -81,7 +89,8 @@ extension HomeScreenCategories on _HomeScreenState {
           color:   const Color(0xFF43A047),
           labelFn: (ctx) => ctx.tr(AppStrings.leaveRequest),
           subFn:   (_) => '휴가 신청',
-          onTap:   () => _push(LeaveRequestScreen(userProfile: _userProfile!)),
+          onTap:   () => _pushAndRefresh(
+              LeaveRequestScreen(userProfile: _userProfile!)),
         ),
       if (isManager || isNutrition)
         _QuickActionDef(
@@ -118,12 +127,10 @@ extension HomeScreenCategories on _HomeScreenState {
     final available    = _availableQuickActions(isAdmin, isNutrition, myDept);
     final availableIds = available.map((a) => a.id).toSet();
 
-    // 저장된 ID 중 이 유저가 사용 가능한 것만 필터
     var selectedIds = _quickActionIds
         .where((id) => availableIds.contains(id))
         .toList();
 
-    // 선택된 것이 없으면 기본값
     if (selectedIds.isEmpty) {
       selectedIds = ['meal_check', 'attendance']
           .where(availableIds.contains).toList();
@@ -135,7 +142,6 @@ extension HomeScreenCategories on _HomeScreenState {
         .toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // 헤더 + 편집 버튼
       Row(children: [
         _SectionHeader(
           title:    context.tr(AppStrings.quickAction),
@@ -165,7 +171,6 @@ extension HomeScreenCategories on _HomeScreenState {
       ]),
       const SizedBox(height: 12),
 
-      // 2열 그리드 (최대 4개)
       ...List.generate((selectedActions.length / 2).ceil(), (row) {
         final start      = row * 2;
         final end        = (start + 2).clamp(0, selectedActions.length);
@@ -185,7 +190,6 @@ extension HomeScreenCategories on _HomeScreenState {
                 ),
               ),
               if (i < rowActions.length - 1) const SizedBox(width: 12),
-              // 홀수 개일 때 빈 자리
               if (rowActions.length == 1) const Expanded(child: SizedBox()),
             ],
           ]),
@@ -293,45 +297,45 @@ extension HomeScreenCategories on _HomeScreenState {
                 () => _push(const MealReportScreen())),
         ],
       ),
+
       // ── 출퇴근 리포트
-      _Category(
-        title: '출퇴근 리포트',
-        icon:  Icons.punch_clock_rounded,
-        color: const Color(0xFF2E6BFF),
-        desc:  '근무중 · 퇴근 · 휴가 · 미출근',
-        items: [
-          _SubItem(Icons.punch_clock_rounded, '출퇴근 기록',
-              () => _push(AttendanceScreen(userProfile: _userProfile!))),
-          if (isManager)
-            _SubItem(Icons.how_to_reg_rounded, '출퇴근 현황',
-                () => _push(AttendanceManagementScreen(
-                    isManager: true, mode: 'attendance'))
-                    .then((_) => _loadBannerData())),
-        ],
+    _Category(
+      title: context.tr(AppStrings.catAttendanceReport),
+      icon:  Icons.punch_clock_rounded,
+      color: const Color(0xFF2E6BFF),
+      desc:  context.tr(AppStrings.catAttendanceReportDesc),
+      items: [
+        _SubItem(Icons.punch_clock_rounded,
+            context.tr(AppStrings.attendanceRecord),
+            () => _push(AttendanceScreen(userProfile: _userProfile!))),
+        if (isManager)
+          _SubItem(Icons.how_to_reg_rounded,
+              context.tr(AppStrings.attendanceStatus),
+              () => _pushAndRefresh(AttendanceManagementScreen(
+                  isManager: true, mode: 'attendance'))),
+          ],
       ),
       // ── 휴가 리포트
       _Category(
-        title: '휴가 리포트',
+        title: context.tr(AppStrings.catLeaveReport),
         icon:  Icons.flight_takeoff_rounded,
         color: const Color(0xFF3D5AFE),
-        desc:  '실시간 현황 · 연차기록',
+        desc:  context.tr(AppStrings.catLeaveReportDesc),
         badge: isManager && _pendingLeaveCount > 0 ? _pendingLeaveCount : null,
         items: [
-          _SubItem(Icons.edit_calendar_rounded, '휴가 신청',
-              () => _push(LeaveRequestScreen(userProfile: _userProfile!))
-                  .then((_) => _loadBannerData())),
+          _SubItem(Icons.edit_calendar_rounded,
+              context.tr(AppStrings.leaveRequest),
+              () => _pushAndRefresh(
+                  LeaveRequestScreen(userProfile: _userProfile!))),
           if (isManager) ...[
-            _SubItem(Icons.flight_takeoff_rounded, '실시간 휴가 현황',
-                () => _push(AttendanceManagementScreen(
-                    isManager: true, mode: 'leave', initialTab: 0))
-                    .then((_) => _loadBannerData())),
-            _SubItem(Icons.history_rounded, '연차 기록',
-                () => _push(AttendanceManagementScreen(
-                    isManager: true, mode: 'leave', initialTab: 2))
-                    .then((_) => _loadBannerData()),
-                // ✅ isManager 체크 추가
-                badge: isManager && _pendingLeaveCount > 0
-                    ? _pendingLeaveCount : null),
+            _SubItem(Icons.flight_takeoff_rounded,
+                context.tr(AppStrings.leaveRealtime),
+                () => _pushAndRefresh(AttendanceManagementScreen(
+                    isManager: true, mode: 'leave', initialTab: 0))),
+            _SubItem(Icons.history_rounded,
+                context.tr(AppStrings.leaveHistoryRecord),
+                () => _pushAndRefresh(AttendanceManagementScreen(
+                    isManager: true, mode: 'leave', initialTab: 2))),
           ],
         ],
       ),
@@ -365,12 +369,12 @@ extension HomeScreenCategories on _HomeScreenState {
         color: const Color(0xFF00BCD4),
         desc:  context.tr(AppStrings.catDormDesc),
         items: [
-          _SubItem(Icons.hotel_rounded, context.tr(AppStrings.dormitory),
+          _SubItem(Icons.hotel_rounded,
+              context.tr(AppStrings.dormitory),
               () => _push(DormManagementScreen(
                   isAdmin: isAdmin, userProfile: _userProfile!))),
-          _SubItem(Icons.grid_view_rounded, '호실 배치도',
-              () => _push(DormRoomMapScreen(isAdmin: isAdmin))),
-          _SubItem(Icons.cleaning_services_rounded, '베란다 청소',
+          _SubItem(Icons.cleaning_services_rounded,
+              context.tr(AppStrings.balconyCleaning),
               () => _push(CleaningScreen(userProfile: _userProfile!))),
         ],
       ),
@@ -409,8 +413,7 @@ extension HomeScreenCategories on _HomeScreenState {
                 () => _push(VehicleScreen(
                     userProfile: _userProfile!, isAdmin: isAdmin))),
             _SubItem(Icons.local_gas_station_rounded, '주유 신청',
-                () => _push(FuelCardScreen(isAdmin: isAdmin))
-                    .then((_) => _loadBannerData()),
+                () => _pushAndRefresh(FuelCardScreen(isAdmin: isAdmin)),
                 badge: isAdmin && _pendingFuelCount > 0
                     ? _pendingFuelCount : null),
           ],
@@ -424,9 +427,8 @@ extension HomeScreenCategories on _HomeScreenState {
         items: [
           _SubItem(Icons.checkroom_rounded,
               context.tr(AppStrings.uniformTitle),
-              () => _push(UniformRequestScreen(
-                  userProfile: _userProfile!, isAdmin: isAdmin))
-                  .then((_) => _loadBannerData()),
+              () => _pushAndRefresh(UniformRequestScreen(
+                  userProfile: _userProfile!, isAdmin: isAdmin)),
               badge: isAdmin && _pendingUniformCount > 0
                   ? _pendingUniformCount : null),
           _SubItem(Icons.credit_card_rounded, '명함 지갑',
@@ -544,7 +546,6 @@ class _QuickActionEditSheetState extends State<_QuickActionEditSheet> {
           borderRadius: BorderRadius.circular(28)),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // 핸들
           Container(
             width: 36, height: 4,
             margin: const EdgeInsets.only(top: 12, bottom: 16),
@@ -552,8 +553,6 @@ class _QuickActionEditSheetState extends State<_QuickActionEditSheet> {
                 color: Colors.grey[300],
                 borderRadius: BorderRadius.circular(2)),
           ),
-
-          // 헤더
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(children: [
@@ -585,7 +584,6 @@ class _QuickActionEditSheetState extends State<_QuickActionEditSheet> {
                     color: Colors.black.withOpacity(0.38))),
           ),
 
-          // ── 선택된 항목 ──
           if (selectedDefs.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -651,7 +649,6 @@ class _QuickActionEditSheetState extends State<_QuickActionEditSheet> {
                 color: Colors.black.withOpacity(0.06)),
           ],
 
-          // ── 추가 가능한 항목 ──
           if (unselected.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
@@ -714,7 +711,6 @@ class _QuickActionEditSheetState extends State<_QuickActionEditSheet> {
 
           const SizedBox(height: 12),
 
-          // 저장 버튼
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SizedBox(

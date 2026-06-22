@@ -142,6 +142,45 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
   String _tr(Map<String, String> map) => context.tr(map);
 
   @override
+  void _showFullImage(String url) {
+  showDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.92),
+    builder: (_) => GestureDetector(
+      onTap: () => Navigator.pop(context),
+      child: Stack(
+        children: [
+          InteractiveViewer(
+            minScale: 0.8,
+            maxScale: 4,
+            child: Center(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image_rounded, color: Colors.white54, size: 48),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40, right: 16,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
   void dispose() {
     _animCtrl.dispose();
     super.dispose();
@@ -439,18 +478,40 @@ class _NoticeDetailScreenState extends State<NoticeDetailScreen>
               ]),
               const SizedBox(height: 20),
               if (imageUrl != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: Image.network(
-                    imageUrl.toString(),
-                    width: double.infinity,
-                    height: 180,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox(),
-                  ),
-                ),
-                const SizedBox(height: 18),
-              ],
+  GestureDetector(
+    onTap: () => _showFullImage(imageUrl.toString()),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxHeight: 320),
+        color: Colors.white.withOpacity(0.12), // 세로 사진 양옆 여백 배경
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            Image.network(
+              imageUrl.toString(),
+              width: double.infinity,
+              fit: BoxFit.contain, // 잘림 없이 비율 유지
+              errorBuilder: (_, __, ___) => const SizedBox(),
+            ),
+            // 확대 가능 힌트 아이콘
+            Container(
+              margin: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.fullscreen_rounded, color: Colors.white, size: 18),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ),
+  const SizedBox(height: 18),
+],
               Text(
                 _displayTitle,
                 style: const TextStyle(

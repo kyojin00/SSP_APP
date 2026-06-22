@@ -648,7 +648,10 @@ class _VehicleScreenState extends State<VehicleScreen>
 
           const SizedBox(height: 12),
 
-          // 액션 버튼
+          // ── 액션 버튼 ──
+          //  • 운행 중이 아님       → "출발 기록"
+          //  • 본인 운행 중         → "귀환 기록"
+          //  • 다른 직원 운행 중    → "대신 도착 처리"  (누구나 누를 수 있음)
           if (!isDriving)
             _gradientActionBtn(
               label: '출발 기록',
@@ -666,24 +669,12 @@ class _VehicleScreenState extends State<VehicleScreen>
               onTap: () => _showReturnSheet(v),
             )
           else
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.04),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                Icon(Icons.lock_outline_rounded,
-                    size: 16, color: Colors.grey),
-                SizedBox(width: 6),
-                Text('다른 직원이 사용 중',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w700)),
-              ]),
+            _gradientActionBtn(
+              label: '대신 도착 처리',
+              icon: Icons.assignment_turned_in_rounded,
+              colors: [Colors.deepOrange.shade400, Colors.deepOrange.shade700],
+              shadowColor: Colors.deepOrange,
+              onTap: () => _showReturnSheet(v),
             ),
         ]),
       ),
@@ -784,12 +775,14 @@ class _VehicleScreenState extends State<VehicleScreen>
       builder: (_) => _ReturnSheet(
         vehicle:  v,
         log:      v.currentLog!,
-        onSubmit: (mileageAfter) => _submitReturn(v, mileageAfter),
+        onSubmit: (mileageAfter, destination) =>
+            _submitReturn(v, mileageAfter, destination),
       ),
     );
   }
 
-  Future<void> _submitReturn(_Vehicle v, int mileageAfter) async {
+  Future<void> _submitReturn(
+      _Vehicle v, int mileageAfter, String destination) async {
     try {
       final logId         = v.currentLog!['id'] as String;
       final mileageBefore = v.currentLog!['mileage_before'] as int;
@@ -798,6 +791,7 @@ class _VehicleScreenState extends State<VehicleScreen>
         'distance':      mileageAfter - mileageBefore,
         'return_time':   DateFormat('HH:mm').format(DateTime.now()),
         'status':        'DONE',
+        'destination':   destination,   // ← 경유지 추가/경로 수정 반영
       }).eq('id', logId);
       await _loadData();
       _snack('귀환 기록 완료! 수고하셨습니다 ✅', color: _teal);
