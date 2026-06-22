@@ -44,4 +44,4 @@ Flutter 기반 PWA로 제작되어 웹·모바일에서 설치 없이 사용할 
 
 ---
 
-© 2025 승산팩 시스템. All rights reserved.
+© 2026 승산팩 시스템. All rights reserved.
